@@ -52,3 +52,6 @@ Thumbs.db
 .idea/
 .vscode/
 *.log
+
+# Large local product artefacts (keep on disk / SharePoint; not in git)
+docs/artefacts/*.pdf
