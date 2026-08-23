@@ -1,0 +1,54 @@
+# Root .gitignore — monorepo
+
+# Secrets / env
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+credentials*.json
+service-account*.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.coverage
+htmlcov/
+backend/*.db
+backend/**/*.db
+
+# Flutter / Dart
+frontend/.dart_tool/
+frontend/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+frontend/.packages
+frontend/build/
+frontend/.pub-cache/
+frontend/ios/Pods/
+frontend/ios/.symlinks/
+frontend/android/.gradle/
+frontend/android/local.properties
+frontend/android/app/debug/
+frontend/android/app/profile/
+frontend/android/app/release/
+frontend/**/*.iml
+frontend/.idea/
+
+# Large raw OpenDOSM monthly extracts (fetch via data/README.md)
+data/open_dosm/*.csv
+data/open_dosm/*.parquet
+
+# Leftover / local
+mobile/
+_pdf_preview/
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
