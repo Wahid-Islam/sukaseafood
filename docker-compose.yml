@@ -1,0 +1,66 @@
+# SukaSeafood — local development stack
+#
+# Postgres is the system of record for the SukaSeafood I1 domain (17 tables).
+# Firebase is used for hosting + object storage only; it never holds domain data.
+#
+#   docker compose up -d db        # start Postgres
+#   docker compose logs -f db      # watch init
+#   docker compose down            # stop (keeps volume)
+#   docker compose down -v         # stop and destroy data
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: sukaseafood-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sukaseafood}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sukaseafood}
+      POSTGRES_DB: ${POSTGRES_DB:-sukaseafood}
+      # Deterministic collation so LOWER(TRIM(alias)) indexes behave the same
+      # everywhere (matters for the alias search index).
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Scripts in this directory run once, in filename order, on an empty volume.
+      - ./backend/db/docker-initdb:/docker-entrypoint-initdb.d:ro
+      - ./backend/db:/opt/sukaseafood/db:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sukaseafood} -d ${POSTGRES_DB:-sukaseafood}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # Optional web UI: docker compose --profile tools up -d pgadmin  -> http://localhost:5050
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: sukaseafood-pgadmin
+    profiles: ["tools"]
+    restart: unless-stopped
+    environment:
+      # The domain must be a REAL, non-reserved TLD. pgAdmin refuses
+      # special-use names such as .local, .test, .invalid and .localhost, and it
+      # refuses them regardless of CHECK_EMAIL_DELIVERABILITY — that flag covers
+      # whether the domain resolves, not whether it is reserved. A .local
+      # address here makes the container crash-loop at startup.
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-dev@sukaseafood.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-sukaseafood}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    volumes:
+      # Without this, every recreate loses your registered server connection.
+      - pgadmindata:/var/lib/pgadmin
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+    name: sukaseafood-pgdata
+  pgadmindata:
+    name: sukaseafood-pgadmindata

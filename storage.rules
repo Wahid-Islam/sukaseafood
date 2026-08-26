@@ -1,0 +1,30 @@
+rules_version = '2';
+
+// Seafood imagery served to the app.
+//
+// Read is public: these are reference photos of fish, they contain nothing
+// private, and making them public means the backend can hand out plain download
+// URLs derived from the species code instead of minting a signed URL per image
+// on every list request.
+//
+// Write is closed to clients entirely. Images are uploaded by the team through
+// the Firebase console or CI with a service account, which is exactly the path
+// the Admin SDK in backend/app/firebase.py uses.
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /seafood/{imageId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /cv-reference/{allPaths=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

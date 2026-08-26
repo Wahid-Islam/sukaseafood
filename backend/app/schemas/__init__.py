@@ -156,3 +156,17 @@ class HealthOut(BaseModel):
     status: str
     app: str
     version: str
+
+class DatabaseHealthOut(BaseModel):
+    """Dependency health — what /health/db reports.
+
+    Split from the plain liveness probe on purpose: a container that is up but
+    cannot reach Postgres should fail a readiness check while still answering
+    /health, so orchestrators stop routing traffic to it without killing it.
+    """
+
+    status: str
+    database: str
+    schema_applied: bool
+    seafood_count: int | None = None
+    firebase: dict = {}

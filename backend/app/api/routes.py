@@ -1,12 +1,15 @@
 """API route modules."""
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import firebase
 from app.config import get_settings
-from app.database import get_db
+from app.database import get_db, ping, schema_is_present
 from app.schemas import (
     CookingRecommendationOut,
+    DatabaseHealthOut,
     HealthOut,
     IdentifyResponse,
     PriceContextOut,
@@ -15,6 +18,7 @@ from app.schemas import (
     SeafoodSummaryOut,
     SourceMetaOut,
 )
+from app.models import SeafoodItem
 from app.services import seafood as seafood_service
 
 router = APIRouter()
@@ -28,6 +32,37 @@ async def health() -> HealthOut:
         status="ok",
         app=settings.app_name,
         version=settings.app_version,
+    )
+
+
+@router.get("/health/db", response_model=DatabaseHealthOut)
+async def database_health(db: AsyncSession = Depends(get_db)) -> DatabaseHealthOut:
+    """Readiness probe: can we reach Postgres, and is the schema applied?
+
+    Returns 200 with a degraded status rather than raising, so a monitoring
+    system can distinguish "unreachable" from "reachable but unmigrated" —
+    two very different pages at 3am.
+    """
+    reachable = await ping()
+    if not reachable:
+        return DatabaseHealthOut(
+            status="unavailable",
+            database="unreachable",
+            schema_applied=False,
+            firebase=firebase.status(),
+        )
+
+    applied = await schema_is_present()
+    count = None
+    if applied:
+        count = await db.scalar(select(func.count()).select_from(SeafoodItem))
+
+    return DatabaseHealthOut(
+        status="ok" if applied and count else "degraded",
+        database="postgresql",
+        schema_applied=applied,
+        seafood_count=count,
+        firebase=firebase.status(),
     )
 
 

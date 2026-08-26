@@ -1,0 +1,51 @@
+{
+  "_comment": [
+    "Firebase serves BYTES and DELIVERY only. Every fact the app displays comes",
+    "from PostgreSQL via the FastAPI backend — no domain data is ever written to",
+    "Firestore or Realtime Database.",
+    "",
+    "Hosting serves the Flutter web build and proxies /api/** to the FastAPI",
+    "service on Cloud Run, so the client makes same-origin requests and needs no",
+    "CORS exemption in production.",
+    "",
+    "Deploy:  flutter build web --release  (in frontend/)  then  firebase deploy"
+  ],
+  "hosting": {
+    "public": "frontend/build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "/api/**",
+        "run": {
+          "serviceId": "sukaseafood-api",
+          "region": "asia-southeast1"
+        }
+      },
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ],
+    "headers": [
+      {
+        "source": "**/*.@(js|css|woff2)",
+        "headers": [
+          { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+        ]
+      },
+      {
+        "source": "/index.html",
+        "headers": [
+          { "key": "Cache-Control", "value": "no-cache" }
+        ]
+      }
+    ]
+  },
+  "storage": {
+    "rules": "storage.rules"
+  }
+}

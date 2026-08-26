@@ -1,0 +1,13 @@
+# Optional — Firebase Admin SDK.
+#
+# Only needed for SIGNED Storage URLs (private buckets) or server-side uploads.
+# Public image URLs work without it; see app/firebase.py.
+#
+#     pip install -r requirements-firebase.txt
+#
+# Pulls in `cryptography`, which needs a Rust toolchain if no prebuilt wheel
+# matches your interpreter. If it tries to compile, force a wheel first:
+#
+#     pip install --only-binary=:all: cryptography
+#
+firebase-admin>=6.6.0
