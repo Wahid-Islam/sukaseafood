@@ -1,5 +1,6 @@
 """SukaSeafood FastAPI application entrypoint."""
 
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -7,17 +8,39 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import router
 from app.config import get_settings
-from app.database import SessionLocal, init_db
-from app.seed import seed_database
+from app.database import dispose_engine, ping, schema_is_present
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    """Create tables and seed Iteration 1 species on startup."""
-    await init_db()
-    async with SessionLocal() as session:
-        await seed_database(session)
+    """Verify the database on startup; never mutate it.
+
+    Deliberately does NOT create tables or seed. Schema changes belong to
+    `alembic upgrade head` (or backend/db/apply.sh), run as an explicit
+    deployment step. An app that silently creates its own tables will happily
+    run against a half-migrated database and hide the problem until it is a
+    data problem.
+    """
+    settings = get_settings()
+
+    if not await ping():
+        logger.error(
+            "Cannot reach PostgreSQL at the configured DATABASE_URL. "
+            "Start it with `docker compose up -d db`."
+        )
+    elif not await schema_is_present():
+        logger.error(
+            "Connected to PostgreSQL, but the I1 schema is missing. "
+            "Run `alembic upgrade head` or `backend/db/apply.sh`."
+        )
+    else:
+        logger.info("PostgreSQL ready (%s).", settings.environment)
+
     yield
+
+    await dispose_engine()
 
 
 def create_app() -> FastAPI:

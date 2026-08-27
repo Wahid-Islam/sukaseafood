@@ -44,6 +44,16 @@ frontend/.idea/
 data/open_dosm/*.csv
 data/open_dosm/*.parquet
 
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+.runtimeconfig.json
+
+# Postgres
+backend/db/dump/*.sql
+
 # Leftover / local
 mobile/
 _pdf_preview/

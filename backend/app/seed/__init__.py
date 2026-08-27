@@ -1,91 +1,74 @@
-"""Database seeding for Iteration 1 canonical seafood records."""
+"""Apply the SQL reference seed from Python.
+
+The seed itself lives in backend/db/seed/*.sql, not in Python dictionaries. One
+definition of the reference data, usable three ways:
+
+    backend/db/apply.sh          shell / CI / Supabase
+    docker-entrypoint-initdb.d   automatic on a fresh Docker volume
+    apply_seed()                 tests and one-off local resets
+
+Everything is idempotent, so calling this against a seeded database is a no-op
+that costs a few UPDATEs.
+
+Note the raw-driver call below: these files contain multiple statements and
+dollar-quoted function bodies, which asyncpg only accepts through its simple
+query protocol. SQLAlchemy's exec_driver_sql would try to prepare them and fail.
+"""
+
+from __future__ import annotations
+
+import logging
+from pathlib import Path
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
-from app.models import (
-    CookingSuitability,
-    PriceObservation,
-    SeafoodAlias,
-    SeafoodItem,
-    SupplyContext,
-    SustainabilityRecord,
-)
-from app.seed.data import SEED_SEAFOOD, build_price_series
+from app.database import engine as default_engine
+from app.models import SeafoodItem
+
+logger = logging.getLogger(__name__)
+
+# backend/app/seed/ -> backend/db
+DB_DIR = Path(__file__).resolve().parents[2] / "db"
+SCHEMA_DIR = DB_DIR / "schema"
+SEED_DIR = DB_DIR / "seed"
+
+
+async def _execute_file(engine: AsyncEngine, path: Path) -> None:
+    sql = path.read_text(encoding="utf-8")
+    async with engine.begin() as conn:
+        raw = await conn.get_raw_connection()
+        await raw.driver_connection.execute(sql)
+
+
+async def apply_schema(engine: AsyncEngine | None = None) -> None:
+    """Create the 17 tables, enums, functions and indexes. Idempotent."""
+    engine = engine or default_engine
+    for name in ("i1_initial_schema.sql", "i1_functions_indexes.sql"):
+        path = SCHEMA_DIR / name
+        logger.info("Applying schema file %s", path.name)
+        await _execute_file(engine, path)
+
+
+async def apply_seed(engine: AsyncEngine | None = None) -> None:
+    """Load reference data in filename order. Idempotent."""
+    engine = engine or default_engine
+    for path in sorted(SEED_DIR.glob("*.sql")):
+        logger.info("Applying seed file %s", path.name)
+        await _execute_file(engine, path)
 
 
 async def seed_database(session: AsyncSession) -> None:
-    """Insert the five supported species if the table is empty."""
-    existing = await session.scalar(select(SeafoodItem).limit(1))
-    if existing is not None:
+    """Seed only if the canonical species table is empty.
+
+    In any shared environment the schema and seed are applied by migrations
+    before the process starts, so this is normally a single SELECT that finds
+    rows and returns.
+    """
+    if await session.scalar(select(SeafoodItem).limit(1)) is not None:
         return
+    logger.warning("seafood_item is empty — applying reference seed.")
+    await apply_seed()
 
-    for item in SEED_SEAFOOD:
-        seafood = SeafoodItem(
-            fish_id=item["fish_id"],
-            scientific_name=item["scientific_name"],
-            primary_common_name=item["primary_common_name"],
-            fish_type=item["fish_type"],
-            common_in=item["common_in"],
-            market_availability=item["market_availability"],
-            about=item["about"],
-            image_url=item["image_url"],
-            cv_class=item["cv_class"],
-            pricecatcher_item_code=item["pricecatcher_item_code"],
-        )
-        session.add(seafood)
 
-        for alias, language in item["aliases"]:
-            session.add(
-                SeafoodAlias(
-                    fish_id=item["fish_id"],
-                    alias=alias,
-                    language=language,
-                )
-            )
-
-        sus = item["sustainability"]
-        session.add(
-            SustainabilityRecord(
-                fish_id=item["fish_id"],
-                classification=sus["classification"],
-                origin=sus["origin"],
-                production_method=sus["production_method"],
-                explanation=sus["explanation"],
-                why_it_matters=sus["why_it_matters"],
-            )
-        )
-
-        supply = item["supply"]
-        session.add(
-            SupplyContext(
-                fish_id=item["fish_id"],
-                summary=supply["summary"],
-                trend_label=supply["trend_label"],
-            )
-        )
-
-        for method, score, rationale in item["cooking"]:
-            session.add(
-                CookingSuitability(
-                    fish_id=item["fish_id"],
-                    method=method,
-                    suitability_score=score,
-                    rationale=rationale,
-                    verified=True,
-                )
-            )
-
-        for point in build_price_series(item["base_price"]):
-            session.add(
-                PriceObservation(
-                    fish_id=item["fish_id"],
-                    observed_date=point["observed_date"],
-                    price_rm_per_kg=point["price_rm_per_kg"],
-                    premise_state=point["premise_state"],
-                    premise_type=point["premise_type"],
-                    note=point["note"],
-                )
-            )
-
-    await session.commit()
+__all__ = ["apply_schema", "apply_seed", "seed_database"]

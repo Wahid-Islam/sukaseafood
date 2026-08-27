@@ -1,11 +1,24 @@
 -- SukaSeafood Iteration 1
--- Final PostgreSQL / Supabase executable schema
--- Based on the final 17-table Database & Data Structure Design.
+-- PostgreSQL schema — DDL only (17 tables, 8 enums).
 --
--- IMPORTANT:
---   * Intended for a fresh / empty schema.
---   * This is a schema creation file, not a migration from an older design.
---   * I1 is anonymous: no Auth/user-profile/favourite/history/purchase/Journey tables.
+-- Source of truth for the I1 "Database & Data Structure Design" handoff.
+-- Runs against a fresh/empty schema on PostgreSQL 14+ (local Docker or Supabase).
+--
+-- This file creates STRUCTURE ONLY. Reference and canonical data live in
+-- ../seed/*.sql and are applied after this file, in filename order:
+--
+--   1. schema/i1_initial_schema.sql     <- this file (tables, enums, indexes)
+--   2. schema/i1_functions_indexes.sql  <- suka_uuid5() + operational constraints
+--   3. seed/01_locations.sql            <- Malaysian states + districts
+--   4. seed/02_data_sources.sql         <- data_source + source_snapshot
+--   5. seed/03_cooking_methods.sql      <- cooking_method vocabulary
+--   6. seed/04_seafood_i1.sql           <- the 5 I1 species + aliases
+--
+-- Apply everything at once with:  backend/db/apply.sh
+--
+-- I1 is anonymous: no auth / user-profile / favourite / history / purchase /
+-- journey tables. Business rules (WWF clarification, PriceCatcher fallback)
+-- live in FastAPI, not in database triggers.
 
 BEGIN;
 
@@ -376,106 +389,4 @@ CREATE TABLE IF NOT EXISTS recipe_cooking_method (
   UNIQUE (recipe_id, cooking_method_id)
 );
 
--- =========================================================
--- MINIMAL I1 CANONICAL SEAFOOD SEED
--- Only values explicitly defined in the final design are seeded here.
--- =========================================================
-
-INSERT INTO seafood_item (
-  seafood_item_id,
-  code,
-  canonical_name_ms,
-  display_name_en,
-  scientific_name,
-  supports_cv,
-  active
-)
-VALUES
-  (gen_random_uuid(), 'SF001', 'Kembung / Pelaling', 'Indian Mackerel', 'Rastrelliger kanagurta', TRUE, TRUE),
-  (gen_random_uuid(), 'SF002', 'Bawal Hitam', 'Black Pomfret', 'Parastromateus niger', TRUE, TRUE),
-  (gen_random_uuid(), 'SF003', 'Ikan Merah', 'Red Snapper', 'Lutjanus sebae', TRUE, TRUE),
-  (gen_random_uuid(), 'SF004', 'Tilapia', 'Nile Tilapia', 'Oreochromis niloticus', TRUE, TRUE),
-  (gen_random_uuid(), 'SF005', 'Kerapu Bintik', 'Orange-spotted Grouper', 'Epinephelus coioides', TRUE, TRUE)
-ON CONFLICT (code) DO UPDATE SET
-  canonical_name_ms = EXCLUDED.canonical_name_ms,
-  display_name_en = EXCLUDED.display_name_en,
-  scientific_name = EXCLUDED.scientific_name,
-  supports_cv = EXCLUDED.supports_cv,
-  active = EXCLUDED.active;
-
--- Basic aliases using only names defined in the final design / example.
-INSERT INTO seafood_alias (
-  seafood_alias_id,
-  seafood_item_id,
-  alias_name,
-  language_code,
-  alias_type,
-  verified
-)
-SELECT
-  gen_random_uuid(),
-  s.seafood_item_id,
-  v.alias_name,
-  v.language_code,
-  v.alias_type::seafood_alias_type_enum,
-  TRUE
-FROM seafood_item s
-JOIN (
-  VALUES
-    ('SF001', 'Kembung', 'ms', 'MALAY'),
-    ('SF001', 'Pelaling', 'ms', 'MALAY'),
-    ('SF001', 'Indian Mackerel', 'en', 'ENGLISH_COMMON'),
-    ('SF001', 'Rastrelliger kanagurta', 'la', 'SCIENTIFIC'),
-
-    ('SF002', 'Bawal Hitam', 'ms', 'MALAY'),
-    ('SF002', 'Black Pomfret', 'en', 'ENGLISH_COMMON'),
-    ('SF002', 'Parastromateus niger', 'la', 'SCIENTIFIC'),
-
-    ('SF003', 'Ikan Merah', 'ms', 'MALAY'),
-    ('SF003', 'Red Snapper', 'en', 'ENGLISH_COMMON'),
-    ('SF003', 'Lutjanus sebae', 'la', 'SCIENTIFIC'),
-
-    ('SF004', 'Tilapia', 'ms', 'MALAY'),
-    ('SF004', 'Nile Tilapia', 'en', 'ENGLISH_COMMON'),
-    ('SF004', 'Oreochromis niloticus', 'la', 'SCIENTIFIC'),
-
-    ('SF005', 'Kerapu Bintik', 'ms', 'MALAY'),
-    ('SF005', 'Orange-spotted Grouper', 'en', 'ENGLISH_COMMON'),
-    ('SF005', 'Epinephelus coioides', 'la', 'SCIENTIFIC')
-) AS v(code, alias_name, language_code, alias_type)
-  ON s.code = v.code
-ON CONFLICT DO NOTHING;
-
 COMMIT;
-
--- =========================================================
--- OPTIONAL VERIFICATION QUERIES
--- =========================================================
-
-SELECT COUNT(*) AS suka_i1_expected_table_count
-FROM information_schema.tables
-WHERE table_schema = 'public'
-  AND table_name IN (
-    'location',
-    'seafood_item',
-    'seafood_alias',
-    'data_source',
-    'source_snapshot',
-    'wwf_assessment',
-    'pricecatcher_item',
-    'price_item_mapping',
-    'price_summary',
-    'price_trend_point',
-    'supply_landing_point',
-    'cooking_method',
-    'cooking_suitability',
-    'cv_model_version',
-    'recipe',
-    'recipe_seafood_mapping',
-    'recipe_cooking_method'
-  );
-
-SELECT code, canonical_name_ms, display_name_en, scientific_name
-FROM seafood_item
-WHERE code IN ('SF001', 'SF002', 'SF003', 'SF004', 'SF005')
-ORDER BY code;

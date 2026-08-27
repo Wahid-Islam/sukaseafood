@@ -14,6 +14,8 @@ sukaseafood/
 ├── backend/                  # FastAPI service + domain data layer
 ├── data/                     # Raw / reference datasets (not runtime secrets)
 │   └── open_dosm/            # OpenDOSM PriceCatcher extracts
+├── docker-compose.yml        # Local PostgreSQL
+├── firebase.json             # Firebase Hosting (web build + /api rewrite)
 ├── docs/                     # Product & engineering documentation
 │   ├── architecture/
 │   └── artefacts/            # Discovery / iteration PDFs
@@ -27,23 +29,47 @@ Frontend and backend are **separate deployable packages** with their own README,
 | Package | Stack | Responsibility |
 | --- | --- | --- |
 | [`frontend/`](./frontend) | Flutter 3.44 / Dart 3.12 | iOS + Android client |
-| [`backend/`](./backend) | FastAPI + SQLAlchemy | Canonical seafood API |
+| [`backend/`](./backend) | FastAPI + SQLAlchemy + PostgreSQL | Canonical seafood API |
 | [`data/`](./data) | CSV / reference | Offline OpenDOSM extracts |
 | [`docs/`](./docs) | Markdown + PDFs | Architecture & artefacts |
 
 ## Quick start
 
-### 1. Backend
+### 1. Database
 
-```powershell
+PostgreSQL is the system of record. The container applies the 17-table schema
+and the reference seed on first start.
+
+```bash
+cp .env.example .env          # once — sets the container's port and credentials
+docker compose up -d db
+```
+
+If port 5432 is already taken (a system Postgres, Postgres.app, another
+project), set `POSTGRES_PORT=5433` in that `.env` and match the port in
+`backend/.env`'s `DATABASE_URL`. Check what holds it with
+`sudo lsof -nP -iTCP:5432 -sTCP:LISTEN`.
+
+Browse the data: `docker compose exec db psql -U sukaseafood -d sukaseafood`,
+or `docker compose --profile tools up -d pgadmin` for a web UI on
+http://localhost:5050.
+
+Details and design notes: [`backend/db/README.md`](./backend/db/README.md)
+
+### 2. Backend
+
+```bash
 cd backend
 pip install -r requirements.txt
+cp .env.example .env
+alembic upgrade head
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 OpenAPI: http://127.0.0.1:8000/docs
+Readiness: http://127.0.0.1:8000/api/v1/health/db
 
-### 2. Frontend
+### 3. Frontend
 
 ```powershell
 cd frontend
