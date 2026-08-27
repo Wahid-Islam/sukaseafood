@@ -55,3 +55,6 @@ Thumbs.db
 
 # Large local product artefacts (keep on disk / SharePoint; not in git)
 docs/artefacts/*.pdf
+
+# Local UI PDF raster previews
+_ui_preview/

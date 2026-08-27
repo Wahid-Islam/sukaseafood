@@ -1,307 +1,410 @@
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_theme.dart';
-import '../../data/api/sukaseafood_api.dart';
-import '../../data/models/seafood_models.dart';
-import '../../shared/widgets/common_widgets.dart';
+import '../../data/mock/mock_catalog.dart';
+import '../../shared/widgets/ui_kit.dart';
 
-class SeafoodDetailScreen extends StatefulWidget {
-  const SeafoodDetailScreen({
-    super.key,
-    required this.api,
-    required this.fishId,
-  });
+class SeafoodDetailScreen extends StatelessWidget {
+  const SeafoodDetailScreen({super.key, required this.seafoodId});
 
-  final SukaseafoodApi api;
-  final String fishId;
-
-  @override
-  State<SeafoodDetailScreen> createState() => _SeafoodDetailScreenState();
-}
-
-class _SeafoodDetailScreenState extends State<SeafoodDetailScreen>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabs;
-  late Future<SeafoodProfile> _profileFuture;
-  late Future<PriceContext> _priceFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabs = TabController(length: 3, vsync: this);
-    _profileFuture = widget.api.getProfile(widget.fishId);
-    _priceFuture = widget.api.getPrice(widget.fishId);
-  }
-
-  @override
-  void dispose() {
-    _tabs.dispose();
-    super.dispose();
-  }
+  final String seafoodId;
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<SeafoodProfile>(
-      future: _profileFuture,
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return Scaffold(
-            appBar: AppBar(title: const Text('Seafood')),
-            body: Center(
-              child: snapshot.hasError
-                  ? Text('${snapshot.error}')
-                  : const CircularProgressIndicator(),
-            ),
-          );
-        }
+    final SeafoodItem item = MockCatalog.byId(seafoodId);
+    final Color tone = AppTheme.classificationColor(item.classification);
 
-        final SeafoodProfile profile = snapshot.data!;
-        return Scaffold(
-          appBar: AppBar(
-            title: Text(profile.primaryCommonName),
-            bottom: TabBar(
-              controller: _tabs,
-              indicatorColor: AppTheme.teal,
-              labelColor: Colors.white,
-              unselectedLabelColor: Colors.white70,
-              tabs: const [
-                Tab(text: 'Understand'),
-                Tab(text: 'Price'),
-                Tab(text: 'Cook'),
-              ],
+    return Scaffold(
+      backgroundColor: AppColors.foam,
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            expandedHeight: 280,
+            pinned: true,
+            backgroundColor: AppColors.navy,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => context.pop(),
+            ),
+            actions: const [
+              Icon(Icons.favorite_border, color: Colors.white),
+              SizedBox(width: 8),
+              Icon(Icons.ios_share, color: Colors.white),
+              SizedBox(width: 12),
+            ],
+            flexibleSpace: FlexibleSpaceBar(
+              background: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.network(
+                    item.imageUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        const ColoredBox(color: AppColors.navy),
+                  ),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.15),
+                          AppColors.navy.withValues(alpha: 0.88),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 16,
+                    right: 16,
+                    bottom: 24,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.commonName,
+                          style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                                fontSize: 36,
+                              ),
+                        ),
+                        Text(
+                          item.scientificName,
+                          style: const TextStyle(
+                            color: AppColors.teal,
+                            fontStyle: FontStyle.italic,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            const Icon(Icons.photo_camera_outlined,
+                                size: 14, color: Colors.white70),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Also known as: ${item.alsoKnownAs}',
+                              style: const TextStyle(color: Colors.white70),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          item.about,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.9),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Positioned(
+                    right: 16,
+                    bottom: 16,
+                    child: Text('1/5', style: TextStyle(color: Colors.white70)),
+                  ),
+                ],
+              ),
             ),
           ),
-          body: TabBarView(
-            controller: _tabs,
-            children: [
-              _UnderstandTab(profile: profile),
-              FutureBuilder<PriceContext>(
-                future: _priceFuture,
-                builder: (context, priceSnap) {
-                  if (!priceSnap.hasData) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  return _PriceTab(
-                    profile: profile,
-                    price: priceSnap.data!,
-                  );
-                },
-              ),
-              _CookTab(profile: profile),
-            ],
-          ),
-          bottomNavigationBar: SafeArea(
+          SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: FilledButton.icon(
-                onPressed: () => context.push('/cooking'),
-                icon: const Icon(Icons.swap_horiz),
-                label: const Text('Find cooking matches'),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _UnderstandTab extends StatelessWidget {
-  const _UnderstandTab({required this.profile});
-
-  final SeafoodProfile profile;
-
-  @override
-  Widget build(BuildContext context) {
-    final SustainabilityInfo? sus = profile.sustainability;
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Text(
-          profile.primaryCommonName,
-          style: Theme.of(context).textTheme.headlineMedium,
-        ),
-        Text(profile.scientificName),
-        const SizedBox(height: 10),
-        if (sus != null) ClassificationChip(classification: sus.classification),
-        const SizedBox(height: 16),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            _Fact(label: 'Type', value: profile.fishType),
-            _Fact(label: 'Common in', value: profile.commonIn),
-            _Fact(label: 'Market', value: profile.marketAvailability),
-          ],
-        ),
-        const SizedBox(height: 18),
-        if (sus != null) ...[
-          const SectionHeader(title: 'Why this classification'),
-          Text(sus.explanation),
-          const SizedBox(height: 12),
-          const SectionHeader(title: 'Why it matters to you'),
-          Text(sus.whyItMatters),
-          const SizedBox(height: 8),
-          Text(
-            'Source: ${sus.sourceName}',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          Text(
-            'Origin: ${sus.origin} · Method: ${sus.productionMethod}',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ],
-        const SizedBox(height: 16),
-        const SectionHeader(title: 'About this seafood'),
-        Text(profile.about),
-        if (profile.aliases.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          Text('Also known as: ${profile.aliases.join(', ')}'),
-        ],
-      ],
-    );
-  }
-}
-
-class _PriceTab extends StatelessWidget {
-  const _PriceTab({required this.profile, required this.price});
-
-  final SeafoodProfile profile;
-  final PriceContext price;
-
-  @override
-  Widget build(BuildContext context) {
-    final List<FlSpot> spots = [];
-    for (int i = 0; i < price.history.length; i++) {
-      spots.add(FlSpot(i.toDouble(), price.history[i].priceRmPerKg));
-    }
-
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        const SectionHeader(
-          title: 'Observed price context',
-          subtitle: 'OpenDOSM PriceCatcher — not a national average',
-        ),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                price.latestPriceRmPerKg == null
-                    ? 'Unavailable'
-                    : 'RM ${price.latestPriceRmPerKg!.toStringAsFixed(2)} /kg',
-                style: Theme.of(context).textTheme.headlineMedium,
-              ),
-              Text('Status: ${price.status}'),
-              if (price.changeVsRecentPct != null)
-                Text(
-                  '${price.changeVsRecentPct!.toStringAsFixed(1)}% vs recent window',
-                ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        if (spots.length >= 2) ...[
-          const SectionHeader(title: 'Recent trend'),
-          SizedBox(
-            height: 200,
-            child: LineChart(
-              LineChartData(
-                gridData: const FlGridData(show: false),
-                titlesData: const FlTitlesData(show: false),
-                borderData: FlBorderData(show: false),
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: spots,
-                    isCurved: true,
-                    color: AppTheme.teal,
-                    barWidth: 3,
-                    dotData: const FlDotData(show: false),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 110),
+              child: Column(
+                children: [
+                  SoftCard(
+                    child: Row(
+                      children: [
+                        _Fact(
+                          icon: Icons.bubble_chart_outlined,
+                          label: 'Fish Type',
+                          value: item.fishType,
+                        ),
+                        _divider(),
+                        _Fact(
+                          icon: Icons.place_outlined,
+                          label: 'Common in',
+                          value: item.commonIn,
+                        ),
+                        _divider(),
+                        _Fact(
+                          icon: Icons.calendar_month_outlined,
+                          label: 'Observed in market',
+                          value: item.marketAvailability,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  SoftCard(
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Row(
+                                children: [
+                                  Icon(Icons.spa, color: AppColors.good),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'WWF Sustainability Classification',
+                                    style: TextStyle(fontWeight: FontWeight.w700),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Icon(Icons.check_circle, color: tone),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    item.classification,
+                                    style: TextStyle(
+                                      color: tone,
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 18,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Text(item.classificationBlurb),
+                              const SizedBox(height: 10),
+                              const Text(
+                                'About WWF ratings',
+                                style: TextStyle(
+                                  color: AppColors.tealDark,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(
+                          width: 88,
+                          height: 88,
+                          child: CustomPaint(
+                            painter: _GaugePainter(color: tone),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  SoftCard(
+                    color: AppColors.goodSoft,
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 42,
+                          height: 42,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(Icons.eco, color: tone),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Why this is a good choice for you',
+                                style: TextStyle(
+                                  color: tone,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(item.whyGood.join(' · ')),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.chevron_right),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SoftCard(
+                          onTap: () => context.push('/price/${item.id}'),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Row(
+                                children: [
+                                  Icon(Icons.circle, size: 8, color: AppColors.good),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    'LIVE DATA',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.good,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              const Row(
+                                children: [
+                                  Text(
+                                    'Check Price',
+                                    style: TextStyle(fontWeight: FontWeight.w800),
+                                  ),
+                                  Icon(Icons.north_east, size: 14, color: AppColors.tealDark),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              const Icon(Icons.show_chart, color: AppColors.good, size: 36),
+                              const SizedBox(height: 8),
+                              Text(
+                                'RM ${item.priceRm.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 20,
+                                ),
+                              ),
+                              const Text('Latest price / kg'),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: SoftCard(
+                          onTap: () => context.push('/cooking/${item.id}'),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Row(
+                                children: [
+                                  Icon(Icons.restaurant, size: 14, color: Color(0xFF7B61FF)),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    'COOKING',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF7B61FF),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              const Row(
+                                children: [
+                                  Text(
+                                    'Find Cooking Options',
+                                    style: TextStyle(fontWeight: FontWeight.w800),
+                                  ),
+                                  Icon(Icons.north_east, size: 14, color: Color(0xFF7B61FF)),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              NetworkFishImage(
+                                url: MockCatalog.grilled,
+                                height: 52,
+                                borderRadius: 10,
+                              ),
+                              const SizedBox(height: 8),
+                              const Row(
+                                children: [
+                                  Icon(Icons.star, color: AppColors.star, size: 16),
+                                  Icon(Icons.star, color: AppColors.star, size: 16),
+                                  Icon(Icons.star, color: AppColors.star, size: 16),
+                                  Icon(Icons.star, color: AppColors.star, size: 16),
+                                  Icon(Icons.star, color: AppColors.star, size: 16),
+                                ],
+                              ),
+                              const Text('Top rating match'),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
           ),
         ],
-        if (profile.supply != null) ...[
-          const SizedBox(height: 12),
-          const SectionHeader(title: 'Supply context'),
-          Text(profile.supply!.trendLabel,
-              style: const TextStyle(fontWeight: FontWeight.w700)),
-          Text(profile.supply!.summary),
-          Text(
-            'Source: ${profile.supply!.sourceName}',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ],
-        const SizedBox(height: 12),
-        Text(price.disclaimer, style: Theme.of(context).textTheme.bodySmall),
-      ],
+      ),
     );
   }
-}
 
-class _CookTab extends StatelessWidget {
-  const _CookTab({required this.profile});
-
-  final SeafoodProfile profile;
-
-  @override
-  Widget build(BuildContext context) {
-    final List<CookingInfo> cooking = [...profile.cooking]
-      ..sort((a, b) => b.suitabilityScore.compareTo(a.suitabilityScore));
-
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        const SectionHeader(
-          title: 'Cooking suitability',
-          subtitle: 'Verified Iteration 1 mappings only',
-        ),
-        ...cooking.map(
-          (CookingInfo c) => ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text(c.method),
-            subtitle: Text(c.rationale),
-            trailing: Text('${(c.suitabilityScore * 100).round()}%'),
-          ),
-        ),
-      ],
-    );
-  }
+  static Widget _divider() => Container(width: 1, height: 46, color: AppColors.line);
 }
 
 class _Fact extends StatelessWidget {
-  const _Fact({required this.label, required this.value});
+  const _Fact({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
 
+  final IconData icon;
   final String label;
   final String value;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 150,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-      ),
+    return Expanded(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: Theme.of(context).textTheme.labelMedium),
-          const SizedBox(height: 4),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w700)),
+          Icon(icon, color: AppColors.tealDark, size: 18),
+          const SizedBox(height: 6),
+          Text(label, style: const TextStyle(fontSize: 10, color: AppColors.muted)),
+          Text(
+            value,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+          ),
         ],
       ),
     );
   }
+}
+
+class _GaugePainter extends CustomPainter {
+  _GaugePainter({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Offset c = Offset(size.width / 2, size.height * 0.7);
+    final double radius = size.width * 0.42;
+    final Paint track = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 10
+      ..strokeCap = StrokeCap.round
+      ..color = AppColors.line;
+    final Paint value = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 10
+      ..strokeCap = StrokeCap.round
+      ..color = color;
+    canvas.drawArc(
+      Rect.fromCircle(center: c, radius: radius),
+      3.14,
+      3.14,
+      false,
+      track,
+    );
+    canvas.drawArc(
+      Rect.fromCircle(center: c, radius: radius),
+      3.14,
+      2.5,
+      false,
+      value,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _GaugePainter oldDelegate) => oldDelegate.color != color;
 }

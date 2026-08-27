@@ -1,17 +1,16 @@
 import 'package:go_router/go_router.dart';
 
-import '../../data/api/sukaseafood_api.dart';
 import '../../features/cooking/cooking_screen.dart';
+import '../../features/explore/explore_screen.dart';
 import '../../features/favorites/favorites_screen.dart';
 import '../../features/home/app_shell.dart';
 import '../../features/home/home_screen.dart';
-import '../../features/identify/identify_screen.dart';
+import '../../features/price/price_screen.dart';
 import '../../features/profile/profile_screen.dart';
+import '../../features/scan/scan_screen.dart';
 import '../../features/seafood/seafood_detail_screen.dart';
-import '../../features/search/search_screen.dart';
 
-/// Declarative router for the Iteration 1 decision journey.
-GoRouter createRouter(SukaseafoodApi api) {
+GoRouter createRouter() {
   return GoRouter(
     initialLocation: '/home',
     routes: [
@@ -24,23 +23,23 @@ GoRouter createRouter(SukaseafoodApi api) {
             routes: [
               GoRoute(
                 path: '/home',
-                builder: (context, state) => HomeScreen(api: api),
+                builder: (context, state) => const HomeScreen(),
               ),
             ],
           ),
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/search',
-                builder: (context, state) => SearchScreen(api: api),
+                path: '/explore',
+                builder: (context, state) => const ExploreScreen(),
               ),
             ],
           ),
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/cooking',
-                builder: (context, state) => CookingScreen(api: api),
+                path: '/scan',
+                builder: (context, state) => const ScanScreen(),
               ),
             ],
           ),
@@ -63,14 +62,21 @@ GoRouter createRouter(SukaseafoodApi api) {
         ],
       ),
       GoRoute(
-        path: '/identify',
-        builder: (context, state) => IdentifyScreen(api: api),
+        path: '/seafood/:id',
+        builder: (context, state) {
+          return SeafoodDetailScreen(seafoodId: state.pathParameters['id']!);
+        },
       ),
       GoRoute(
-        path: '/seafood/:fishId',
+        path: '/price/:id',
         builder: (context, state) {
-          final String fishId = state.pathParameters['fishId']!;
-          return SeafoodDetailScreen(api: api, fishId: fishId);
+          return PriceScreen(seafoodId: state.pathParameters['id']!);
+        },
+      ),
+      GoRoute(
+        path: '/cooking/:id',
+        builder: (context, state) {
+          return CookingScreen(seafoodId: state.pathParameters['id']!);
         },
       ),
     ],
