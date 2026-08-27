@@ -257,11 +257,12 @@ class HomeScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   SizedBox(
-                    height: 168,
+                    height: 176,
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
                       itemCount: favourites.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 12),
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(width: 12),
                       itemBuilder: (context, index) {
                         final SeafoodItem item = favourites[index];
                         return _FavouriteCard(
@@ -454,11 +455,16 @@ class _FavouriteCard extends StatelessWidget {
         padding: const EdgeInsets.all(10),
         onTap: onTap,
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Stack(
               children: [
-                NetworkFishImage(url: item.imageUrl, height: 72, borderRadius: 12),
+                NetworkFishImage(
+                  url: item.imageUrl,
+                  height: 64,
+                  borderRadius: 12,
+                ),
                 const Positioned(
                   right: 6,
                   top: 6,
@@ -466,14 +472,19 @@ class _FavouriteCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Text(item.commonName, style: const TextStyle(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 6),
+            Text(
+              item.commonName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+            ),
             Text(
               'RM ${item.priceRm.toStringAsFixed(2)} /kg',
               style: const TextStyle(
                 color: AppColors.tealDark,
                 fontWeight: FontWeight.w700,
-                fontSize: 12,
+                fontSize: 11,
               ),
             ),
             Text(
@@ -481,7 +492,7 @@ class _FavouriteCard extends StatelessWidget {
               style: TextStyle(
                 color: down ? AppColors.good : AppColors.avoid,
                 fontWeight: FontWeight.w700,
-                fontSize: 12,
+                fontSize: 11,
               ),
             ),
           ],
