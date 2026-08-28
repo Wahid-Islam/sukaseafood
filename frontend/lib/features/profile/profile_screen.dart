@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/auth/auth_controller.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets/ui_kit.dart';
 
@@ -8,6 +11,10 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final AuthController auth = context.watch<AuthController>();
+    final String name = auth.displayName;
+    final String email = auth.profile?.email ?? '';
+
     return Scaffold(
       backgroundColor: AppColors.foam,
       body: ListView(
@@ -27,17 +34,19 @@ class ProfileScreen extends StatelessWidget {
                         ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Hai, Amir',
-                    style: TextStyle(
+                  Text(
+                    'Hai, $name',
+                    style: const TextStyle(
                       color: AppColors.teal,
                       fontWeight: FontWeight.w800,
                       fontSize: 22,
                     ),
                   ),
                   Text(
-                    'Prototype profile — PocketBase auth comes next.',
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.75)),
+                    email.isEmpty ? 'Signed in' : email,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.75),
+                    ),
                   ),
                 ],
               ),
@@ -49,39 +58,41 @@ class ProfileScreen extends StatelessWidget {
               children: [
                 SoftCard(
                   child: Column(
-                    children: const [
+                    children: [
                       ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.badge_outlined),
+                        title: const Text('Name'),
+                        subtitle: Text(name),
+                      ),
+                      const Divider(),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.mail_outline),
+                        title: const Text('Email'),
+                        subtitle: Text(email.isEmpty ? '—' : email),
+                      ),
+                      const Divider(),
+                      const ListTile(
                         contentPadding: EdgeInsets.zero,
                         leading: Icon(Icons.location_on_outlined),
                         title: Text('Default location'),
                         subtitle: Text('Kuala Lumpur'),
                       ),
-                      Divider(),
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: Icon(Icons.notifications_none),
-                        title: Text('Notifications'),
-                        subtitle: Text('Price drops & better choices'),
-                      ),
-                      Divider(),
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: Icon(Icons.menu_book_outlined),
-                        title: Text('Data sources'),
-                        subtitle: Text('WWF SOS · OpenDOSM · Fish-Vista · OBIS'),
-                      ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 12),
-                const SoftCard(
+                SoftCard(
                   child: ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: Icon(Icons.cloud_outlined),
-                    title: Text('Backend plan'),
-                    subtitle: Text(
-                      'PocketBase + HF Space + GitHub Actions for OpenDOSM refresh',
-                    ),
+                    leading: const Icon(Icons.logout, color: AppColors.avoid),
+                    title: const Text('Sign out'),
+                    subtitle: const Text('Return to onboarding'),
+                    onTap: () async {
+                      await context.read<AuthController>().signOut();
+                      if (context.mounted) context.go('/onboarding');
+                    },
                   ),
                 ),
               ],

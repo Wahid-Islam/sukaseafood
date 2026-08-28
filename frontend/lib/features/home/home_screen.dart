@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/auth/auth_controller.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/mock/mock_catalog.dart';
 import '../../shared/widgets/ui_kit.dart';
@@ -10,6 +12,7 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final String displayName = context.watch<AuthController>().displayName;
     final SeafoodItem featured = MockCatalog.featured;
     final List<SeafoodItem> favourites = MockCatalog.items.take(3).toList();
 
@@ -84,13 +87,13 @@ class HomeScreen extends StatelessWidget {
                         style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                               color: Colors.white,
                             ),
-                        children: const [
-                          TextSpan(text: 'Hai, '),
+                        children: [
+                          const TextSpan(text: 'Hai, '),
                           TextSpan(
-                            text: 'Amir',
-                            style: TextStyle(color: AppColors.teal),
+                            text: displayName,
+                            style: const TextStyle(color: AppColors.teal),
                           ),
-                          TextSpan(text: '!'),
+                          const TextSpan(text: '!'),
                         ],
                       ),
                     ),

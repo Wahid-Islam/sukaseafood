@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sukaseafood/core/auth/auth_controller.dart';
+import 'package:sukaseafood/data/models/user_profile.dart';
 import 'package:sukaseafood/main.dart';
 
 void main() {
@@ -9,7 +11,15 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(const SukaSeafoodApp());
+    final AuthController auth = AuthController.forTesting(
+      profile: const UserProfile(
+        uid: 'test',
+        name: 'Amir',
+        email: 'amir@example.com',
+      ),
+    );
+
+    await tester.pumpWidget(SukaSeafoodApp(authController: auth));
     await tester.pump();
 
     expect(find.textContaining('SukaSeafood'), findsWidgets);

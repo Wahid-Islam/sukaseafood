@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "sukaseafood"
-  }
+    "default": "sukaseafood-654b7"
+  },
+  "targets": {},
+  "etags": {}
 }

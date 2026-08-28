@@ -77,6 +77,22 @@ class AppTheme {
         surface: AppColors.card,
       ),
       textTheme: textTheme,
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: AppColors.foam,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppColors.line),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppColors.line),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppColors.teal, width: 1.6),
+        ),
+      ),
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.navy,
         foregroundColor: Colors.white,
