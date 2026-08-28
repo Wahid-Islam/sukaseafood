@@ -1,0 +1,13 @@
+specVersion: "v1"
+serviceId: "sukaseafood-654b7-service"
+location: "us-east4"
+schemas:
+  - source: "./schema"
+    datasource:
+      postgresql:
+        database: "sukaseafood-654b7-database"
+        cloudSql:
+          instanceId: "sukaseafood-654b7-instance"
+          # schemaValidation: "STRICT"     # STRICT mode makes Postgres schema match Data Connect exactly.
+          # schemaValidation: "COMPATIBLE" # COMPATIBLE mode makes Postgres schema compatible with Data Connect.
+connectorDirs: ["./example"]
