@@ -5,10 +5,11 @@ class AppConstants {
   static const String appName = 'SukaSeafood';
   static const String tagline = 'Saving our seafood, from boat to bowl.';
 
-  /// Android emulator reaches host machine localhost via 10.0.2.2.
+  /// Physical device: `adb reverse tcp:8000 tcp:8000` then this default works.
+  /// Android emulator: `--dart-define=API_BASE_URL=http://10.0.2.2:8000/api/v1`
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:8000/api/v1',
+    defaultValue: 'http://127.0.0.1:8000/api/v1',
   );
 
   static const List<String> cookingMethods = [

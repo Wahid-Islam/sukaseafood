@@ -27,6 +27,7 @@ echo "Target: $(printf '%s' "$DB" | sed -E 's#://[^@]*@#://***@#')"
 
 run "$DIR/schema/i1_initial_schema.sql"
 run "$DIR/schema/i1_functions_indexes.sql"
+run "$DIR/schema/i1_app_user.sql"
 
 if [ "$SCHEMA_ONLY" -eq 0 ]; then
   for f in "$DIR"/seed/*.sql; do

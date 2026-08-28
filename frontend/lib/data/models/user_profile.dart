@@ -1,6 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
-/// App user profile stored in Firestore at `users/{uid}`.
+/// App user profile stored in PostgreSQL (`app_user`) via the FastAPI backend.
 class UserProfile {
   const UserProfile({
     required this.uid,
@@ -14,31 +12,20 @@ class UserProfile {
   final String email;
   final DateTime? createdAt;
 
-  factory UserProfile.fromMap(String uid, Map<String, dynamic> data) {
+  factory UserProfile.fromJson(Map<String, dynamic> data) {
+    final Object? created = data['created_at'];
     DateTime? createdAt;
-    final Object? created = data['createdAt'];
-    if (created is Timestamp) {
-      createdAt = created.toDate();
-    } else if (created is DateTime) {
-      createdAt = created;
+    if (created is String && created.isNotEmpty) {
+      createdAt = DateTime.tryParse(created);
     }
 
     return UserProfile(
-      uid: uid,
+      uid: (data['id'] as String?) ?? '',
       name: (data['name'] as String?)?.trim().isNotEmpty == true
           ? (data['name'] as String).trim()
           : 'Friend',
       email: (data['email'] as String?) ?? '',
       createdAt: createdAt,
     );
-  }
-
-  Map<String, dynamic> toMap() {
-    return <String, dynamic>{
-      'name': name,
-      'email': email,
-      'createdAt': createdAt ?? DateTime.now().toUtc(),
-      'updatedAt': DateTime.now().toUtc(),
-    };
   }
 }

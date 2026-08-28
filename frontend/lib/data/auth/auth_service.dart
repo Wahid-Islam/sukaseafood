@@ -1,101 +1,136 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:convert';
 
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../core/constants/app_constants.dart';
 import '../models/user_profile.dart';
 
-/// Firebase Auth + Firestore profile persistence.
+class AuthException implements Exception {
+  AuthException(this.message);
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+/// PostgreSQL-backed auth via FastAPI (`/auth/*`). No Firestore.
 class AuthService {
-  AuthService({
-    FirebaseAuth? auth,
-    FirebaseFirestore? firestore,
-  })  : _auth = auth ?? FirebaseAuth.instance,
-        _firestore = firestore ?? FirebaseFirestore.instance;
+  AuthService({http.Client? client}) : _client = client ?? http.Client();
 
-  final FirebaseAuth _auth;
-  final FirebaseFirestore _firestore;
+  static const String _tokenKey = 'sukaseafood_access_token';
 
-  Stream<User?> get authStateChanges => _auth.authStateChanges();
+  final http.Client _client;
+  String? _token;
 
-  User? get currentUser => _auth.currentUser;
+  String? get token => _token;
+  bool get hasToken => _token != null && _token!.isNotEmpty;
 
-  CollectionReference<Map<String, dynamic>> get _users =>
-      _firestore.collection('users');
+  Uri _uri(String path) => Uri.parse('${AppConstants.apiBaseUrl}$path');
+
+  Future<void> restoreSession() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    _token = prefs.getString(_tokenKey);
+  }
+
+  Future<void> _persistToken(String? token) async {
+    _token = token;
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    if (token == null || token.isEmpty) {
+      await prefs.remove(_tokenKey);
+    } else {
+      await prefs.setString(_tokenKey, token);
+    }
+  }
 
   Future<UserProfile> signUp({
     required String name,
     required String email,
     required String password,
   }) async {
-    final String trimmedName = name.trim();
-    final String trimmedEmail = email.trim().toLowerCase();
-
-    final UserCredential credential = await _auth.createUserWithEmailAndPassword(
-      email: trimmedEmail,
-      password: password,
+    final http.Response response = await _client.post(
+      _uri('/auth/signup'),
+      headers: const {'Content-Type': 'application/json'},
+      body: jsonEncode(<String, String>{
+        'name': name.trim(),
+        'email': email.trim().toLowerCase(),
+        'password': password,
+      }),
     );
-    final User user = credential.user!;
-
-    await user.updateDisplayName(trimmedName);
-    await user.reload();
-
-    final UserProfile profile = UserProfile(
-      uid: user.uid,
-      name: trimmedName,
-      email: trimmedEmail,
-      createdAt: DateTime.now().toUtc(),
-    );
-
-    await _users.doc(user.uid).set(<String, dynamic>{
-      'name': profile.name,
-      'email': profile.email,
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-
-    return profile;
+    return _parseAuthResponse(response);
   }
 
   Future<UserProfile> signIn({
     required String email,
     required String password,
   }) async {
-    final UserCredential credential = await _auth.signInWithEmailAndPassword(
-      email: email.trim().toLowerCase(),
-      password: password,
+    final http.Response response = await _client.post(
+      _uri('/auth/login'),
+      headers: const {'Content-Type': 'application/json'},
+      body: jsonEncode(<String, String>{
+        'email': email.trim().toLowerCase(),
+        'password': password,
+      }),
     );
-    return loadProfile(credential.user!.uid);
+    return _parseAuthResponse(response);
   }
 
-  Future<void> signOut() => _auth.signOut();
-
-  Future<UserProfile> loadProfile(String uid) async {
-    final DocumentSnapshot<Map<String, dynamic>> snap =
-        await _users.doc(uid).get();
-
-    if (snap.exists && snap.data() != null) {
-      return UserProfile.fromMap(uid, snap.data()!);
-    }
-
-    final User? user = _auth.currentUser;
-    final String name = user?.displayName?.trim().isNotEmpty == true
-        ? user!.displayName!.trim()
-        : 'Friend';
-    final String email = user?.email ?? '';
-
-    final UserProfile profile = UserProfile(
-      uid: uid,
-      name: name,
-      email: email,
-      createdAt: DateTime.now().toUtc(),
+  Future<UserProfile?> loadCurrentUser() async {
+    if (!hasToken) return null;
+    final http.Response response = await _client.get(
+      _uri('/auth/me'),
+      headers: <String, String>{
+        'Authorization': 'Bearer $_token',
+        'Content-Type': 'application/json',
+      },
     );
+    if (response.statusCode == 401) {
+      await signOut();
+      return null;
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw AuthException(_extractError(response));
+    }
+    final Map<String, dynamic> body =
+        jsonDecode(response.body) as Map<String, dynamic>;
+    return UserProfile.fromJson(body);
+  }
 
-    await _users.doc(uid).set(<String, dynamic>{
-      'name': profile.name,
-      'email': profile.email,
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+  Future<void> signOut() => _persistToken(null);
 
-    return profile;
+  Future<UserProfile> _parseAuthResponse(http.Response response) async {
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw AuthException(_extractError(response));
+    }
+    final Map<String, dynamic> body =
+        jsonDecode(response.body) as Map<String, dynamic>;
+    final String? token = body['access_token'] as String?;
+    if (token == null || token.isEmpty) {
+      throw AuthException('Server did not return an access token.');
+    }
+    await _persistToken(token);
+    final Map<String, dynamic> user =
+        body['user'] as Map<String, dynamic>? ?? <String, dynamic>{};
+    return UserProfile.fromJson(user);
+  }
+
+  String _extractError(http.Response response) {
+    try {
+      final Object? decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        final Object? detail = decoded['detail'];
+        if (detail is String && detail.isNotEmpty) return detail;
+        if (detail is List && detail.isNotEmpty) {
+          final Object first = detail.first;
+          if (first is Map && first['msg'] != null) {
+            return first['msg'].toString();
+          }
+        }
+      }
+    } catch (_) {}
+    if (response.statusCode == 0) {
+      return 'Cannot reach the API. Is the backend running?';
+    }
+    return 'Request failed (${response.statusCode}).';
   }
 }

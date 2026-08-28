@@ -1,9 +1,9 @@
 {
   "_comment": [
-    "Firebase: Hosting + Storage; Auth + Firestore for app accounts (I1).",
-    "SQL Connect / Cloud SQL: sukaseafood-654b7-instance (us-east4) — Blaze trial.",
-    "Seafood domain schema source of truth: backend/db/schema (GitHub), applied to",
-    "Postgres (local Docker or Cloud SQL). Do not put WWF/prices/recipes in Firestore.",
+    "Firebase: Hosting + Storage for delivery only. No Firestore.",
+    "Accounts + seafood domain live in PostgreSQL (local Docker or Cloud SQL).",
+    "SQL Connect Cloud SQL: sukaseafood-654b7-instance (us-east4) — Blaze trial.",
+    "Schema source of truth: backend/db/schema (apply.sh).",
     "",
     "Hosting serves Flutter web and can proxy /api/** to Cloud Run FastAPI.",
     "Deploy web: flutter build web --release (frontend/) then firebase deploy"
@@ -51,12 +51,6 @@
   },
   "storage": {
     "rules": "storage.rules"
-  },
-  "firestore": {
-    "database": "(default)",
-    "location": "asia-southeast1",
-    "rules": "firestore.rules",
-    "indexes": "firestore.indexes.json"
   },
   "emulators": {
     "dataconnect": {

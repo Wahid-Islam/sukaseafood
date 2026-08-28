@@ -16,8 +16,9 @@
 --
 -- Apply everything at once with:  backend/db/apply.sh
 --
--- I1 is anonymous: no auth / user-profile / favourite / history / purchase /
--- journey tables. Business rules (WWF clarification, PriceCatcher fallback)
+-- I1 originally shipped anonymous (no auth tables). App accounts now live in
+-- schema/i1_app_user.sql (PostgreSQL only — not Firestore).
+-- Business rules (WWF clarification, PriceCatcher fallback)
 -- live in FastAPI, not in database triggers.
 
 BEGIN;
