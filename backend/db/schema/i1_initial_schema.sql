@@ -167,22 +167,17 @@ CREATE TABLE IF NOT EXISTS wwf_assessment (
   wwf_assessment_id UUID PRIMARY KEY,
   seafood_item_id UUID NOT NULL REFERENCES seafood_item(seafood_item_id),
   source_snapshot_id UUID NOT NULL REFERENCES source_snapshot(source_snapshot_id),
-  source_record_key TEXT NOT NULL, 
-  seafood_category TEXT,           
-  main_common_name TEXT NOT NULL,  
-  secondary_common_name TEXT,      
-  scientific_name TEXT NOT NULL,   
-  sustainability_rating sustainability_rating_enum NOT NULL, 
-  origin TEXT,                   
-  production_method_raw TEXT,      
-  certification_raw TEXT,          
-  alternatives TEXT,            
-  source_pdf_page INT,          
-  canonical_fish_id TEXT,      
-  fish_type TEXT,                 
-  description TEXT,                
-  context TEXT,                    
-  notes_raw TEXT                
+  source_record_key TEXT NOT NULL,
+  common_name_raw TEXT NOT NULL,
+  scientific_name_raw TEXT NOT NULL,
+  rating sustainability_rating_enum NOT NULL,
+  origin_raw TEXT,
+  origin_code TEXT,
+  production_type TEXT,
+  production_method_raw TEXT,
+  production_method_code TEXT,
+  certification_raw TEXT,
+  notes_raw TEXT
 );
 
 
