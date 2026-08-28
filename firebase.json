@@ -1,14 +1,12 @@
 {
   "_comment": [
-    "Firebase: Hosting + Storage for delivery/images; Auth + Firestore for user",
-    "profiles only (name, email, uid). Seafood domain facts stay in PostgreSQL",
-    "via FastAPI — never write WWF/prices/recipes into Firestore.",
+    "Firebase: Hosting + Storage; Auth + Firestore for app accounts (I1).",
+    "SQL Connect / Cloud SQL: sukaseafood-654b7-instance (us-east4) — Blaze trial.",
+    "Seafood domain schema source of truth: backend/db/schema (GitHub), applied to",
+    "Postgres (local Docker or Cloud SQL). Do not put WWF/prices/recipes in Firestore.",
     "",
-    "Hosting serves the Flutter web build and proxies /api/** to the FastAPI",
-    "service on Cloud Run, so the client makes same-origin requests and needs no",
-    "CORS exemption in production.",
-    "",
-    "Deploy:  flutter build web --release  (in frontend/)  then  firebase deploy"
+    "Hosting serves Flutter web and can proxy /api/** to Cloud Run FastAPI.",
+    "Deploy web: flutter build web --release (frontend/) then firebase deploy"
   ],
   "hosting": {
     "public": "frontend/build/web",
@@ -59,5 +57,13 @@
     "location": "asia-southeast1",
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
+  },
+  "emulators": {
+    "dataconnect": {
+      "dataDir": "dataconnect/.dataconnect/pgliteData"
+    }
+  },
+  "dataconnect": {
+    "source": "dataconnect"
   }
 }

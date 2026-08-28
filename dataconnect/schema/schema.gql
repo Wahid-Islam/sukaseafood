@@ -1,0 +1,10 @@
+# SukaSeafood Data Connect
+#
+# Domain / seafood schema source of truth is already on GitHub:
+#   backend/db/schema/i1_initial_schema.sql
+#   backend/db/schema/i1_functions_indexes.sql
+#   backend/db/seed/*.sql
+#
+# Apply that SQL to this Cloud SQL instance when ready (see README).
+# Do not invent a parallel GraphQL domain model here until the team
+# provides an explicit Data Connect schema.
