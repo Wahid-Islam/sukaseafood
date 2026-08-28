@@ -19,8 +19,14 @@ DB_DIR = Path(__file__).resolve().parents[2] / "db"
 
 
 def upgrade() -> None:
-    sql = (DB_DIR / "schema" / "i1_app_user.sql").read_text(encoding="utf-8")
-    op.execute(sql)
+    path = DB_DIR / "schema" / "i1_app_user.sql"
+    sql = path.read_text(encoding="utf-8")
+    lines = [
+        line
+        for line in sql.splitlines()
+        if line.strip().upper() not in {"BEGIN;", "COMMIT;"}
+    ]
+    op.execute("\n".join(lines))
 
 
 def downgrade() -> None:
