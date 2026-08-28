@@ -1,5 +1,9 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../auth/auth_controller.dart';
+import '../../features/auth/login_screen.dart';
+import '../../features/auth/onboarding_screen.dart';
 import '../../features/cooking/cooking_screen.dart';
 import '../../features/explore/explore_screen.dart';
 import '../../features/favorites/favorites_screen.dart';
@@ -10,10 +14,29 @@ import '../../features/profile/profile_screen.dart';
 import '../../features/scan/scan_screen.dart';
 import '../../features/seafood/seafood_detail_screen.dart';
 
-GoRouter createRouter() {
+GoRouter createRouter(AuthController auth) {
   return GoRouter(
     initialLocation: '/home',
+    refreshListenable: auth,
+    redirect: (BuildContext context, GoRouterState state) {
+      if (!auth.isReady) return null;
+
+      final String loc = state.matchedLocation;
+      final bool onAuth = loc == '/onboarding' || loc == '/login';
+
+      if (!auth.isSignedIn && !onAuth) return '/onboarding';
+      if (auth.isSignedIn && onAuth) return '/home';
+      return null;
+    },
     routes: [
+      GoRoute(
+        path: '/onboarding',
+        builder: (context, state) => const OnboardingScreen(),
+      ),
+      GoRoute(
+        path: '/login',
+        builder: (context, state) => const LoginScreen(),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
           return AppShell(navigationShell: navigationShell);
