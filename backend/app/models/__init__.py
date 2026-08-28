@@ -700,7 +700,33 @@ class RecipeCookingMethod(Base):
     recipe: Mapped[Recipe] = relationship(back_populates="cooking_methods")
 
 
+class AppUser(Base):
+    """Mobile app account stored in PostgreSQL (not Firebase/Firestore)."""
+
+    __tablename__ = "app_user"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    email: Mapped[str] = mapped_column(Text, nullable=False)
+    password_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+
+
 __all__ = [
+    "AppUser",
     "Base",
     "CollectionMethod",
     "CookingMethod",

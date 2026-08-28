@@ -49,6 +49,13 @@ class Settings(BaseSettings):
     firebase_image_prefix: str = "seafood"
     firebase_enabled: bool = True
 
+    # --- Auth (PostgreSQL app_user + JWT) ---------------------------------
+    jwt_secret: str = Field(
+        default="dev-only-change-me-sukaseafood",
+        description="HMAC secret for access tokens. Set JWT_SECRET in production.",
+    )
+    jwt_expire_minutes: int = 60 * 24 * 14  # 14 days
+
     # --- CV ----------------------------------------------------------------
     identify_model_version: str = "mock-cv-v0.1"
 

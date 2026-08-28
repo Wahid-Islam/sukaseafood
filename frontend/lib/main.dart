@@ -1,18 +1,15 @@
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'core/auth/auth_controller.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
-import 'firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-  runApp(SukaSeafoodApp(authController: AuthController()));
+  final AuthController authController = AuthController();
+  await authController.bootstrap();
+  runApp(SukaSeafoodApp(authController: authController));
 }
 
 class SukaSeafoodApp extends StatelessWidget {
