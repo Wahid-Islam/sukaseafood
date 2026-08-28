@@ -11,7 +11,7 @@ WITH expected(table_name) AS (
          ('price_item_mapping'),('price_summary'),('price_trend_point'),
          ('supply_landing_point'),('cooking_method'),('cooking_suitability'),
          ('cv_model_version'),('recipe'),('recipe_seafood_mapping'),
-         ('recipe_cooking_method')
+         ('recipe_cooking_method'),('app_user')
 ),
 found AS (
   SELECT e.table_name,
@@ -22,8 +22,8 @@ found AS (
 )
 SELECT
   CASE WHEN COUNT(*) FILTER (WHERE NOT present) = 0 THEN 'PASS' ELSE 'FAIL' END AS status,
-  '17 domain tables'                                                            AS check_name,
-  COUNT(*) FILTER (WHERE present) || '/17 present'                              AS detail,
+  'domain + app_user tables'                                                    AS check_name,
+  COUNT(*) FILTER (WHERE present) || '/' || COUNT(*) || ' present'              AS detail,
   COALESCE(string_agg(table_name, ', ') FILTER (WHERE NOT present), '-')        AS missing
 FROM found;
 

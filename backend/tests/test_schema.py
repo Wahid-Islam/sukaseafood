@@ -12,7 +12,7 @@ EXPECTED_TABLES = {
     "wwf_assessment", "pricecatcher_item", "price_item_mapping", "price_summary",
     "price_trend_point", "supply_landing_point", "cooking_method",
     "cooking_suitability", "cv_model_version", "recipe", "recipe_seafood_mapping",
-    "recipe_cooking_method",
+    "recipe_cooking_method", "app_user",
 }
 
 EXPECTED_ENUMS = {
@@ -30,7 +30,7 @@ def _fetch(sql: str, **params):
     return asyncio.run(run())
 
 
-def test_all_17_tables_exist():
+def test_all_expected_tables_exist():
     rows = _fetch(
         "SELECT table_name FROM information_schema.tables WHERE table_schema='public'"
     )
