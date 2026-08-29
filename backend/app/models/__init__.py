@@ -1,9 +1,10 @@
-"""SQLAlchemy ORM models for the SukaSeafood I1 domain (17 tables).
+"""SQLAlchemy ORM models for the SukaSeafood V3 domain (21 tables).
 
-These models MIRROR `backend/db/schema/i1_initial_schema.sql`; they do not
-define it. The SQL file is the source of truth (it is what gets applied to
-Supabase and what the handoff document specifies), and Alembic executes that
-file verbatim. Keeping the ORM as a mirror means:
+These models MIRROR `backend/db/schema/v3_initial_schema.sql` and the indexes
+in `backend/db/schema/v3_functions_indexes.sql`; they do not define them. The
+SQL files are the source of truth (they are what gets applied to Supabase and
+what the handoff document specifies), and Alembic executes those files
+verbatim. Keeping the ORM as a mirror means:
 
   * `Base.metadata.create_all()` is never used outside tests
   * enum types are referenced, never created, by Python
@@ -15,8 +16,11 @@ Shape of the domain — everything hangs off one hub:
       ├── seafood_alias           (search resolves here)
       ├── wwf_assessment          (absent row == UNDETERMINED)
       ├── cooking_suitability ──> cooking_method
-      ├── price_item_mapping  ──> pricecatcher_item ──> price_summary
-      │                                             └─> price_trend_point
+      ├── price_item_mapping  ──> pricecatcher_item
+      ├── price_period_summary    (derived rollups keyed by seafood_item_id)
+      ├── price_trend_point       (weekly medians keyed by seafood_item_id)
+      ├── price_forecast          (model outlook, separate from observed prices)
+      ├── cv_class_mapping    ──> cv_model_version
       └── recipe_seafood_mapping ─> recipe
 
 and every fact-bearing table points at a `source_snapshot`, so any number the
@@ -49,8 +53,11 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 from app.models.enums import (
+    AggregationRule,
     CollectionMethod,
     LocationLevel,
+    MappingConfidence,
+    PeriodType,
     PriceMappingType,
     PriceQuality,
     ProductForm,
@@ -137,11 +144,22 @@ class SeafoodItem(Base):
     code: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     canonical_name_ms: Mapped[str] = mapped_column(Text, nullable=False)
     display_name_en: Mapped[str] = mapped_column(Text, nullable=False)
-    scientific_name: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    scientific_name: Mapped[str] = mapped_column(Text, nullable=False)
+    scientific_name_normalized: Mapped[str | None] = mapped_column(Text, nullable=True)
+    taxonomic_level: Mapped[str] = mapped_column(Text, nullable=False)
     family: Mapped[str | None] = mapped_column(Text, nullable=True)
-    supports_cv: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    fish_type: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    supports_cv: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    primary_image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
 
     aliases: Mapped[list[SeafoodAlias]] = relationship(
         back_populates="seafood", cascade="all, delete-orphan"
@@ -174,7 +192,7 @@ class SeafoodAlias(Base):
     __tablename__ = "seafood_alias"
     # Both indexes are on the NORMALISED expression, matching the SQL schema.
     # Declared with text() rather than func.lower(column) so the DDL SQLAlchemy
-    # would emit is byte-identical to what i1_initial_schema.sql creates.
+    # would emit is byte-identical to what v3_initial_schema.sql creates.
     __table_args__ = (
         Index("idx_seafood_alias_search", text("lower(trim(alias_name))")),
         Index(
@@ -265,7 +283,10 @@ class WwfAssessment(Base):
     """
 
     __tablename__ = "wwf_assessment"
-    __table_args__ = (Index("idx_wwf_assessment_item", "seafood_item_id"),)
+    __table_args__ = (
+        UniqueConstraint("source_snapshot_id", "source_record_key"),
+        Index("idx_wwf_assessment_item", "seafood_item_id"),
+    )
 
     wwf_assessment_id: Mapped[uuid.UUID] = _uuid_pk()
     seafood_item_id: Mapped[uuid.UUID] = mapped_column(
@@ -276,6 +297,7 @@ class WwfAssessment(Base):
     )
     source_record_key: Mapped[str] = mapped_column(Text, nullable=False)
     common_name_raw: Mapped[str] = mapped_column(Text, nullable=False)
+    secondary_common_name_raw: Mapped[str | None] = mapped_column(Text, nullable=True)
     scientific_name_raw: Mapped[str] = mapped_column(Text, nullable=False)
     rating: Mapped[SustainabilityRating] = mapped_column(
         _pg_enum(SustainabilityRating, "sustainability_rating_enum"), nullable=False
@@ -286,6 +308,7 @@ class WwfAssessment(Base):
     production_method_raw: Mapped[str | None] = mapped_column(Text, nullable=True)
     production_method_code: Mapped[str | None] = mapped_column(Text, nullable=True)
     certification_raw: Mapped[str | None] = mapped_column(Text, nullable=True)
+    context: Mapped[str | None] = mapped_column(Text, nullable=True)
     notes_raw: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     seafood: Mapped[SeafoodItem] = relationship(back_populates="wwf_assessments")
@@ -293,7 +316,7 @@ class WwfAssessment(Base):
 
 
 # =============================================================================
-# 7. pricecatcher_item  /  8. price_item_mapping
+# 7. pricecatcher_item  /  8. pricecatcher_premise  /  9. price_item_mapping
 # =============================================================================
 
 
@@ -324,6 +347,27 @@ class PriceCatcherItem(Base):
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     mappings: Mapped[list[PriceItemMapping]] = relationship(back_populates="pricecatcher_item")
+
+
+class PriceCatcherPremise(Base):
+    """A retail outlet as PriceCatcher defines it, tied to a canonical location."""
+
+    __tablename__ = "pricecatcher_premise"
+
+    pricecatcher_premise_id: Mapped[uuid.UUID] = _uuid_pk()
+    source_snapshot_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("source_snapshot.source_snapshot_id"), nullable=False
+    )
+    location_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("location.location_id"), nullable=False
+    )
+    external_premise_code: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    premise_name: Mapped[str] = mapped_column(Text, nullable=False)
+    retail_class: Mapped[str] = mapped_column(Text, nullable=False)
+    address_raw: Mapped[str | None] = mapped_column(Text, nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    location: Mapped[Location] = relationship()
 
 
 class PriceItemMapping(Base):
@@ -358,6 +402,16 @@ class PriceItemMapping(Base):
     priority: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     is_default_for_generic: Mapped[bool] = mapped_column(Boolean, nullable=False)
     requires_variant_confirmation: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    aggregation_rule: Mapped[AggregationRule] = mapped_column(
+        _pg_enum(AggregationRule, "aggregation_rule_enum"),
+        nullable=False,
+        default=AggregationRule.SEPARATE,
+    )
+    mapping_confidence: Mapped[MappingConfidence] = mapped_column(
+        _pg_enum(MappingConfidence, "mapping_confidence_enum"),
+        nullable=False,
+        default=MappingConfidence.MEDIUM,
+    )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     seafood: Mapped[SeafoodItem] = relationship(back_populates="price_mappings")
@@ -365,49 +419,53 @@ class PriceItemMapping(Base):
 
 
 # =============================================================================
-# 9. price_summary  /  10. price_trend_point
+# 10. price_period_summary  /  11. price_trend_point
 # =============================================================================
 
 
-class PriceSummary(Base):
-    """A precomputed 30- or 90-day price rollup for one item in one location.
+class PricePeriodSummary(Base):
+    """A precomputed price rollup for one species in one location and period.
 
-    Median rather than mean, with p25/p75 for spread, because premise prices are
-    skewed by a handful of expensive outlets. The three count columns are what
-    `quality_status` is decided from: too few observations, premises or distinct
-    days and the row is INSUFFICIENT_DATA and must not be displayed.
+    Keyed by `seafood_item_id` (not pricecatcher_item_id) because the app quotes
+    canonical species. Median rather than mean, with p25/p75 for spread, because
+    premise prices are skewed by a handful of expensive outlets. The three count
+    columns are what `quality_status` is decided from: too few observations,
+    premises or distinct days and the row is INSUFFICIENT_DATA and must not be
+    displayed.
 
     `calculation_version` is part of the unique key so a recalculated rollup can
     be loaded and compared alongside the old one before it goes live.
     """
 
-    __tablename__ = "price_summary"
+    __tablename__ = "price_period_summary"
     __table_args__ = (
         UniqueConstraint(
-            "pricecatcher_item_id",
+            "seafood_item_id",
             "location_id",
-            "window_days",
+            "period_type",
+            "period_start",
             "period_end",
             "calculation_version",
         ),
-        CheckConstraint("window_days IN (30, 90)", name="price_summary_window_days_check"),
-        CheckConstraint("observation_count >= 0", name="price_summary_observation_count_check"),
-        CheckConstraint("premise_count >= 0", name="price_summary_premise_count_check"),
-        CheckConstraint("distinct_day_count >= 0", name="price_summary_distinct_day_count_check"),
+        CheckConstraint(
+            "observation_count >= 0", name="price_period_summary_observation_count_check"
+        ),
+        CheckConstraint("premise_count >= 0", name="price_period_summary_premise_count_check"),
+        CheckConstraint(
+            "distinct_day_count >= 0", name="price_period_summary_distinct_day_count_check"
+        ),
         Index(
-            "idx_price_summary_lookup",
-            "pricecatcher_item_id",
+            "idx_price_period_summary_lookup",
+            "seafood_item_id",
             "location_id",
-            "window_days",
+            "period_type",
             "period_end",
         ),
     )
 
-    price_summary_id: Mapped[uuid.UUID] = _uuid_pk()
-    pricecatcher_item_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("pricecatcher_item.pricecatcher_item_id"),
-        nullable=False,
+    price_period_summary_id: Mapped[uuid.UUID] = _uuid_pk()
+    seafood_item_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("seafood_item.seafood_item_id"), nullable=False
     )
     location_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("location.location_id"), nullable=False
@@ -418,10 +476,15 @@ class PriceSummary(Base):
     location_level: Mapped[LocationLevel] = mapped_column(
         _pg_enum(LocationLevel, "location_level_enum"), nullable=False
     )
-    window_days: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    period_type: Mapped[PeriodType] = mapped_column(
+        _pg_enum(PeriodType, "period_type_enum"), nullable=False
+    )
     period_start: Mapped[date] = mapped_column(Date, nullable=False)
     period_end: Mapped[date] = mapped_column(Date, nullable=False)
     median_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    average_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    min_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    max_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     p25_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     p75_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     observation_count: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -433,28 +496,29 @@ class PriceSummary(Base):
     calculation_version: Mapped[str] = mapped_column(Text, nullable=False)
     calculated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
-    pricecatcher_item: Mapped[PriceCatcherItem] = relationship()
+    seafood: Mapped[SeafoodItem] = relationship()
     location: Mapped[Location] = relationship()
 
 
 class PriceTrendPoint(Base):
-    """One weekly median — the 12-week sparkline behind a price card."""
+    """One weekly median — the sparkline behind a price card, keyed by species."""
 
     __tablename__ = "price_trend_point"
     __table_args__ = (
         UniqueConstraint(
-            "pricecatcher_item_id", "location_id", "week_start", "calculation_version"
+            "seafood_item_id", "location_id", "week_start", "calculation_version"
         ),
-        CheckConstraint("observation_count >= 0", name="price_trend_point_observation_count_check"),
+        CheckConstraint(
+            "observation_count >= 0", name="price_trend_point_observation_count_check"
+        ),
         CheckConstraint("premise_count >= 0", name="price_trend_point_premise_count_check"),
-        Index("idx_price_trend_lookup", "pricecatcher_item_id", "location_id", "week_start"),
+        CheckConstraint("active_days >= 0", name="price_trend_point_active_days_check"),
+        Index("idx_price_trend_lookup", "seafood_item_id", "location_id", "week_start"),
     )
 
     price_trend_point_id: Mapped[uuid.UUID] = _uuid_pk()
-    pricecatcher_item_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("pricecatcher_item.pricecatcher_item_id"),
-        nullable=False,
+    seafood_item_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("seafood_item.seafood_item_id"), nullable=False
     )
     location_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("location.location_id"), nullable=False
@@ -462,21 +526,101 @@ class PriceTrendPoint(Base):
     source_snapshot_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("source_snapshot.source_snapshot_id"), nullable=False
     )
-    location_level: Mapped[LocationLevel] = mapped_column(
-        _pg_enum(LocationLevel, "location_level_enum"), nullable=False
-    )
     week_start: Mapped[date] = mapped_column(Date, nullable=False)
-    weekly_median: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    weekly_median_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     observation_count: Mapped[int] = mapped_column(Integer, nullable=False)
     premise_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    active_days: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     quality_status: Mapped[PriceQuality] = mapped_column(
         _pg_enum(PriceQuality, "price_quality_enum"), nullable=False
     )
     calculation_version: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+    seafood: Mapped[SeafoodItem] = relationship()
+    location: Mapped[Location] = relationship()
 
 
 # =============================================================================
-# 11. supply_landing_point
+# 12. forecast_model_version  /  13. price_forecast
+# =============================================================================
+
+
+class ForecastModelVersion(Base):
+    """A trained price-forecast model version with validation metrics."""
+
+    __tablename__ = "forecast_model_version"
+    __table_args__ = (
+        CheckConstraint(
+            "interval_level IS NULL OR "
+            "(interval_level > 0 AND interval_level < 1)",
+            name="forecast_model_version_interval_level_check",
+        ),
+    )
+
+    forecast_model_version_id: Mapped[uuid.UUID] = _uuid_pk()
+    version_name: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    algorithm: Mapped[str] = mapped_column(Text, nullable=False)
+    training_window_start: Mapped[date | None] = mapped_column(Date, nullable=True)
+    training_window_end: Mapped[date | None] = mapped_column(Date, nullable=True)
+    validation_mae: Mapped[Decimal | None] = mapped_column(Numeric(12, 4), nullable=True)
+    validation_rmse: Mapped[Decimal | None] = mapped_column(Numeric(12, 4), nullable=True)
+    validation_mape: Mapped[Decimal | None] = mapped_column(Numeric(12, 4), nullable=True)
+    interval_level: Mapped[Decimal | None] = mapped_column(Numeric(5, 4), nullable=True)
+    configuration: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+
+class PriceForecast(Base):
+    """Model-generated price outlook — separate from observed PriceCatcher data."""
+
+    __tablename__ = "price_forecast"
+    __table_args__ = (
+        UniqueConstraint(
+            "seafood_item_id",
+            "location_id",
+            "forecast_model_version_id",
+            "forecast_week_start",
+        ),
+        CheckConstraint(
+            "lower_bound <= expected_price AND expected_price <= upper_bound",
+            name="price_forecast_bounds_check",
+        ),
+    )
+
+    price_forecast_id: Mapped[uuid.UUID] = _uuid_pk()
+    seafood_item_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("seafood_item.seafood_item_id"), nullable=False
+    )
+    location_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("location.location_id"), nullable=False
+    )
+    forecast_model_version_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("forecast_model_version.forecast_model_version_id"),
+        nullable=False,
+    )
+    forecast_week_start: Mapped[date] = mapped_column(Date, nullable=False)
+    expected_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    lower_bound: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    upper_bound: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    outlook: Mapped[str | None] = mapped_column(Text, nullable=True)
+    generated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+    seafood: Mapped[SeafoodItem] = relationship()
+    location: Mapped[Location] = relationship()
+    forecast_model_version: Mapped[ForecastModelVersion] = relationship()
+
+
+# =============================================================================
+# 14. supply_landing_point
 # =============================================================================
 
 
@@ -500,6 +644,10 @@ class SupplyLandingPoint(Base):
             name="supply_landing_point_coast_code_check",
         ),
         CheckConstraint("landings_mt >= 0", name="supply_landing_point_landings_mt_check"),
+        CheckConstraint(
+            "period_month = date_trunc('month', period_month)::date",
+            name="supply_landing_point_period_month_check",
+        ),
         Index("idx_supply_landing_period", "period_month", "scope_level", "state_name"),
     )
 
@@ -516,7 +664,7 @@ class SupplyLandingPoint(Base):
 
 
 # =============================================================================
-# 12. cooking_method  /  13. cooking_suitability
+# 15. cooking_method  /  16. cooking_suitability
 # =============================================================================
 
 
@@ -572,7 +720,7 @@ class CookingSuitability(Base):
 
 
 # =============================================================================
-# 14. cv_model_version
+# 17. cv_model_version  /  18. cv_class_mapping
 # =============================================================================
 
 
@@ -598,10 +746,38 @@ class CvModelVersion(Base):
     input_contract: Mapped[dict] = mapped_column(JSONB, nullable=False)
     metrics: Mapped[dict] = mapped_column(JSONB, nullable=False)
     confidence_threshold: Mapped[Decimal | None] = mapped_column(Numeric(5, 4), nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    class_mappings: Mapped[list[CvClassMapping]] = relationship(back_populates="cv_model_version")
+
+
+class CvClassMapping(Base):
+    """Maps a model class label/index to a canonical seafood_item row."""
+
+    __tablename__ = "cv_class_mapping"
+    __table_args__ = (
+        UniqueConstraint("cv_model_version_id", "model_class_label"),
+        UniqueConstraint("cv_model_version_id", "model_class_index", name="uq_cv_class_mapping_index"),
+    )
+
+    cv_class_mapping_id: Mapped[uuid.UUID] = _uuid_pk()
+    cv_model_version_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("cv_model_version.cv_model_version_id"),
+        nullable=False,
+    )
+    seafood_item_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("seafood_item.seafood_item_id"), nullable=False
+    )
+    model_class_label: Mapped[str] = mapped_column(Text, nullable=False)
+    model_class_index: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    cv_model_version: Mapped[CvModelVersion] = relationship(back_populates="class_mappings")
+    seafood: Mapped[SeafoodItem] = relationship()
 
 
 # =============================================================================
-# 15-17. recipe and its bridges
+# 19-21. recipe and its bridges
 # =============================================================================
 
 
@@ -726,20 +902,27 @@ class AppUser(Base):
 
 
 __all__ = [
+    "AggregationRule",
     "AppUser",
     "Base",
     "CollectionMethod",
     "CookingMethod",
     "CookingSuitability",
+    "CvClassMapping",
     "CvModelVersion",
     "DataSource",
+    "ForecastModelVersion",
     "Location",
     "LocationLevel",
+    "MappingConfidence",
+    "PeriodType",
     "PriceCatcherItem",
+    "PriceCatcherPremise",
+    "PriceForecast",
     "PriceItemMapping",
     "PriceMappingType",
+    "PricePeriodSummary",
     "PriceQuality",
-    "PriceSummary",
     "PriceTrendPoint",
     "ProductForm",
     "Recipe",

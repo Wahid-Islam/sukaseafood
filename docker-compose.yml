@@ -1,7 +1,7 @@
 # SukaSeafood — local development stack
 #
-# Postgres is the system of record for the SukaSeafood I1 domain (17 tables).
-# Firebase is used for hosting + object storage only; it never holds domain data.
+# Postgres is the system of record for the SukaSeafood V3 domain
+# (canonical seafood_item hub). Firebase: Hosting + Storage + SQL Connect.
 #
 #   docker compose up -d db        # start Postgres
 #   docker compose logs -f db      # watch init

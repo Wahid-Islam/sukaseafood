@@ -37,8 +37,8 @@ Frontend and backend are **separate deployable packages** with their own README,
 
 ### 1. Database
 
-PostgreSQL is the system of record. The container applies the 17-table schema
-and the reference seed on first start.
+PostgreSQL is the system of record. The container applies the V3 schema
+(canonical `seafood_item` hub) and the reference seed on first start.
 
 ```bash
 cp .env.example .env          # once — sets the container's port and credentials

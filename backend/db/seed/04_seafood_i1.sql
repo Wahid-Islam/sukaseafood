@@ -9,12 +9,11 @@
 --     across grouper species and production methods, so the API returns
 --     UNDETERMINED. sustainability_rating_enum has no UNDETERMINED member by
 --     design — "we don't know" is the absence of an assessment, never a rating.
---   * No image_url column exists. Images are served from Firebase Storage under
---     a path derived from `code` (see backend/app/firebase.py), so adding or
---     replacing artwork never requires a database write.
+--   * primary_image_url is optional. When null, the API falls back to Firebase
+--     Storage paths derived from `code` (see backend/app/firebase.py).
 --
 -- Idempotent: safe to re-run.
--- Requires: schema/i1_functions_indexes.sql, seed/02_data_sources.sql,
+-- Requires: schema/v3_functions_indexes.sql, seed/02_data_sources.sql,
 --           seed/03_cooking_methods.sql
 
 BEGIN;
@@ -25,37 +24,60 @@ BEGIN;
 
 INSERT INTO seafood_item (
   seafood_item_id, code, canonical_name_ms, display_name_en,
-  scientific_name, family, supports_cv, active, notes
+  scientific_name, scientific_name_normalized, taxonomic_level, family,
+  fish_type, description, supports_cv, active, notes
 )
 SELECT
   suka_uuid5('seafood_item:' || v.code),
   v.code, v.canonical_name_ms, v.display_name_en,
-  v.scientific_name, v.family, v.supports_cv, TRUE, v.notes
+  v.scientific_name, lower(trim(v.scientific_name)), v.taxonomic_level, v.family,
+  v.fish_type, v.description, v.supports_cv, TRUE, v.notes
 FROM (VALUES
-  ('SF001', 'Kembung / Pelaling', 'Indian Mackerel', 'Rastrelliger kanagurta', 'Scombridae', TRUE,
+  ('SF001', 'Kembung / Pelaling', 'Indian Mackerel', 'Rastrelliger kanagurta',
+   'species', 'Scombridae', 'marine pelagic',
+   'Small pelagic sold in almost every Malaysian wet market and supermarket. Cheap, oily, and the default everyday fish — which makes it the most useful comparison point when a shopper is deciding between species.',
+   TRUE,
    'Small pelagic sold in almost every Malaysian wet market and supermarket. Cheap, oily, and the default everyday fish — which makes it the most useful comparison point when a shopper is deciding between species.'),
 
-  ('SF002', 'Bawal Hitam', 'Black Pomfret', 'Parastromateus niger', 'Carangidae', TRUE,
+  ('SF002', 'Bawal Hitam', 'Black Pomfret', 'Parastromateus niger',
+   'species', 'Carangidae', 'marine demersal',
+   'Demersal fish prized for steaming and Chinese-style preparations. Sold whole; the boneless flesh is why it commands a premium over kembung.',
+   TRUE,
    'Demersal fish prized for steaming and Chinese-style preparations. Sold whole; the boneless flesh is why it commands a premium over kembung.'),
 
-  ('SF003', 'Ikan Merah', 'Red Snapper', 'Lutjanus sebae', 'Lutjanidae', TRUE,
+  ('SF003', 'Ikan Merah', 'Red Snapper', 'Lutjanus sebae',
+   'species', 'Lutjanidae', 'marine demersal',
+   'Sold generically as "ikan merah" across several Lutjanus species. The canonical record pins L. sebae, but market identity is genuinely mixed — the app must surface that uncertainty rather than hide it.',
+   TRUE,
    'Sold generically as "ikan merah" across several Lutjanus species. The canonical record pins L. sebae, but market identity is genuinely mixed — the app must surface that uncertainty rather than hide it.'),
 
-  ('SF004', 'Tilapia', 'Nile Tilapia', 'Oreochromis niloticus', 'Cichlidae', TRUE,
+  ('SF004', 'Tilapia', 'Nile Tilapia', 'Oreochromis niloticus',
+   'species', 'Cichlidae', 'freshwater',
+   'Farmed freshwater fish, available year-round at a stable price. The most common responsible everyday swap when a wild species rates poorly.',
+   TRUE,
    'Farmed freshwater fish, available year-round at a stable price. The most common responsible everyday swap when a wild species rates poorly.'),
 
-  ('SF005', 'Kerapu Bintik', 'Orange-spotted Grouper', 'Epinephelus coioides', 'Serranidae', TRUE,
+  ('SF005', 'Kerapu Bintik', 'Orange-spotted Grouper', 'Epinephelus coioides',
+   'species', 'Serranidae', 'marine demersal',
+   'High-value reef fish, wild-caught or farmed depending on supplier. Supply and price both swing widely, and sustainability depends entirely on production method.',
+   TRUE,
    'High-value reef fish, wild-caught or farmed depending on supplier. Supply and price both swing widely, and sustainability depends entirely on production method.')
-) AS v(code, canonical_name_ms, display_name_en, scientific_name, family, supports_cv, notes)
+) AS v(code, canonical_name_ms, display_name_en, scientific_name,
+       taxonomic_level, family, fish_type, description, supports_cv, notes)
 ON CONFLICT (seafood_item_id) DO UPDATE SET
-  code              = EXCLUDED.code,
-  canonical_name_ms = EXCLUDED.canonical_name_ms,
-  display_name_en   = EXCLUDED.display_name_en,
-  scientific_name   = EXCLUDED.scientific_name,
-  family            = EXCLUDED.family,
-  supports_cv       = EXCLUDED.supports_cv,
-  active            = EXCLUDED.active,
-  notes             = EXCLUDED.notes;
+  code                         = EXCLUDED.code,
+  canonical_name_ms            = EXCLUDED.canonical_name_ms,
+  display_name_en              = EXCLUDED.display_name_en,
+  scientific_name              = EXCLUDED.scientific_name,
+  scientific_name_normalized   = EXCLUDED.scientific_name_normalized,
+  taxonomic_level              = EXCLUDED.taxonomic_level,
+  family                       = EXCLUDED.family,
+  fish_type                    = EXCLUDED.fish_type,
+  description                  = EXCLUDED.description,
+  supports_cv                  = EXCLUDED.supports_cv,
+  active                       = EXCLUDED.active,
+  notes                        = EXCLUDED.notes,
+  updated_at                   = now();
 
 -- =========================================================
 -- seafood_alias
@@ -126,52 +148,59 @@ ON CONFLICT (seafood_alias_id) DO UPDATE SET
 
 INSERT INTO wwf_assessment (
   wwf_assessment_id, seafood_item_id, source_snapshot_id, source_record_key,
-  common_name_raw, scientific_name_raw, rating,
+  common_name_raw, secondary_common_name_raw, scientific_name_raw, rating,
   origin_raw, origin_code, production_type, production_method_raw,
-  production_method_code, certification_raw, notes_raw
+  production_method_code, certification_raw, context, notes_raw
 )
 SELECT
   suka_uuid5('wwf_assessment:wwf-sos-2026-handoff:' || v.source_record_key),
   suka_uuid5('seafood_item:' || v.code),
   suka_uuid5('source_snapshot:wwf_sos:wwf-sos-2026-handoff'),
   v.source_record_key,
-  v.common_name_raw, v.scientific_name_raw, v.rating::sustainability_rating_enum,
+  v.common_name_raw, v.secondary_common_name_raw, v.scientific_name_raw,
+  v.rating::sustainability_rating_enum,
   v.origin_raw, v.origin_code, v.production_type, v.production_method_raw,
-  v.production_method_code, v.certification_raw, v.notes_raw
+  v.production_method_code, v.certification_raw, v.context, v.notes_raw
 FROM (VALUES
   ('SF001', 'wwf-sos-kembung-my-wild',
-   'Indian Mackerel (Kembung)', 'Rastrelliger kanagurta', 'BEST_CHOICE',
+   'Indian Mackerel (Kembung)', 'Kembung / Pelaling', 'Rastrelliger kanagurta', 'BEST_CHOICE',
    'Malaysia', 'MY', 'WILD', 'Purse seine', 'PURSE_SEINE', NULL,
+   'Applies to wild-caught Malaysian Indian mackerel taken by purse seine.',
    'Fast-growing small pelagic with a short life cycle; the everyday choice WWF SOS steers consumers toward. Verify against the live listing before any public claim.'),
 
   ('SF002', 'wwf-sos-black-pomfret-my-wild',
-   'Black Pomfret (Bawal Hitam)', 'Parastromateus niger', 'REDUCE',
+   'Black Pomfret (Bawal Hitam)', NULL, 'Parastromateus niger', 'REDUCE',
    'Malaysia / regional', 'MY', 'WILD', 'Trawl / drift net (varies by supplier)', 'TRAWL', NULL,
+   'Applies where catch method is trawl or drift net.',
    'Demersal stock under sustained pressure and commonly taken by trawl. Rated REDUCE rather than AVOID because it remains a legal, managed fishery.'),
 
   ('SF003', 'wwf-sos-red-snapper-my-wild',
-   'Red Snapper (Ikan Merah)', 'Lutjanus sebae', 'AVOID',
+   'Red Snapper (Ikan Merah)', NULL, 'Lutjanus sebae', 'AVOID',
    'Malaysia / imported (varies)', 'MY', 'WILD', 'Trawl / hook and line (mixed snapper)', 'MIXED', NULL,
+   'Mixed snapper group — stock identity rarely labelled at point of sale.',
    'Reef-associated, slow to mature, and sold as a mixed-species group so the specific stock is rarely identifiable at point of sale.'),
 
   ('SF004', 'wwf-sos-tilapia-my-farmed',
-   'Tilapia', 'Oreochromis niloticus', 'BEST_CHOICE',
+   'Tilapia', NULL, 'Oreochromis niloticus', 'BEST_CHOICE',
    'Malaysia (farmed)', 'MY', 'FARMED', 'Pond / cage aquaculture', 'AQUACULTURE', 'MyGAP where labelled',
+   'Applies to responsibly farmed Malaysian tilapia.',
    'Responsibly farmed tilapia is an affordable everyday option that takes pressure off wild stocks. Prefer certified or MyGAP-labelled farms.')
-) AS v(code, source_record_key, common_name_raw, scientific_name_raw, rating,
+) AS v(code, source_record_key, common_name_raw, secondary_common_name_raw, scientific_name_raw, rating,
        origin_raw, origin_code, production_type, production_method_raw,
-       production_method_code, certification_raw, notes_raw)
+       production_method_code, certification_raw, context, notes_raw)
 ON CONFLICT (wwf_assessment_id) DO UPDATE SET
-  rating                 = EXCLUDED.rating,
-  common_name_raw        = EXCLUDED.common_name_raw,
-  scientific_name_raw    = EXCLUDED.scientific_name_raw,
-  origin_raw             = EXCLUDED.origin_raw,
-  origin_code            = EXCLUDED.origin_code,
-  production_type        = EXCLUDED.production_type,
-  production_method_raw  = EXCLUDED.production_method_raw,
-  production_method_code = EXCLUDED.production_method_code,
-  certification_raw      = EXCLUDED.certification_raw,
-  notes_raw              = EXCLUDED.notes_raw;
+  rating                     = EXCLUDED.rating,
+  common_name_raw            = EXCLUDED.common_name_raw,
+  secondary_common_name_raw  = EXCLUDED.secondary_common_name_raw,
+  scientific_name_raw        = EXCLUDED.scientific_name_raw,
+  origin_raw                 = EXCLUDED.origin_raw,
+  origin_code                = EXCLUDED.origin_code,
+  production_type            = EXCLUDED.production_type,
+  production_method_raw      = EXCLUDED.production_method_raw,
+  production_method_code     = EXCLUDED.production_method_code,
+  certification_raw          = EXCLUDED.certification_raw,
+  context                    = EXCLUDED.context,
+  notes_raw                  = EXCLUDED.notes_raw;
 
 -- =========================================================
 -- cooking_suitability

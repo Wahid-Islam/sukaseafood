@@ -1,6 +1,6 @@
 """Test fixtures.
 
-The tests run against a REAL PostgreSQL database, not SQLite. The I1 schema
+The tests run against a REAL PostgreSQL database, not SQLite. The V3 schema
 depends on enum types, JSONB, expression indexes and partial unique indexes;
 a SQLite substitute would pass tests that production would fail.
 

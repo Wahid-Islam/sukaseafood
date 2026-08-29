@@ -1,10 +1,382 @@
-# SukaSeafood Data Connect
+# SukaSeafood Firebase SQL Connect — V3 application schema
 #
-# Domain / seafood schema source of truth is already on GitHub:
-#   backend/db/schema/i1_initial_schema.sql
-#   backend/db/schema/i1_functions_indexes.sql
-#   backend/db/seed/*.sql
+# PostgreSQL DDL remains the source of truth:
+#   backend/db/schema/v3_initial_schema.sql
+#   backend/db/schema/v3_functions_indexes.sql
 #
-# Apply that SQL to this Cloud SQL instance when ready (see README).
-# Do not invent a parallel GraphQL domain model here until the team
-# provides an explicit Data Connect schema.
+# This GraphQL schema mirrors that contract so Firebase SQL Connect can expose
+# the same Cloud SQL database (sukaseafood-654b7-instance). Keep
+# schemaValidation at COMPATIBLE (or unset) so Data Connect does not rewrite
+# the reviewed SQL schema.
+
+# ---------------------------------------------------------------------------
+# Enums
+# ---------------------------------------------------------------------------
+
+enum LocationLevel {
+  STATE
+  DISTRICT
+}
+
+enum SeafoodAliasType {
+  MALAY
+  ENGLISH_COMMON
+  SCIENTIFIC
+  MARKET
+  SPELLING
+}
+
+enum CollectionMethod {
+  OFFICIAL_DOWNLOAD
+  MANUAL_PDF_TRANSCRIPTION
+  TEAM_CURATED
+  MODEL_ARTIFACT
+}
+
+enum SustainabilityRating {
+  BEST_CHOICE
+  REDUCE
+  AVOID
+}
+
+enum ProductForm {
+  WHOLE
+  CUT
+  FILLET
+  HEAD
+  COOKED
+  OTHER
+}
+
+enum PriceMappingType {
+  EXACT
+  COMMON_NAME
+  MARKET_VARIANT
+  MARKET_GROUP
+  PROXY
+}
+
+enum AggregationRule {
+  SEPARATE
+  COMBINE
+  DEFAULT_ONLY
+  PROXY
+}
+
+enum MappingConfidence {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum PriceQuality {
+  DISPLAYABLE
+  INSUFFICIENT_DATA
+  REJECTED
+}
+
+enum PeriodType {
+  WEEK
+  MONTH
+  QUARTER
+}
+
+enum RecipeMappingType {
+  EXACT
+  COMMON_NAME
+  MANUAL_CURATED
+}
+
+# ---------------------------------------------------------------------------
+# Core hub
+# ---------------------------------------------------------------------------
+
+type Location @table(name: "location", key: "location_id") {
+  location_id: UUID! @col(name: "location_id") @default(expr: "uuidV4()")
+  parent: Location @ref(references: "location_id") @col(name: "parent_location_id")
+  level: LocationLevel!
+  state_name: String!
+  district_name: String
+  active: Boolean! @default(value: true)
+}
+
+type SeafoodItem @table(name: "seafood_item", key: "seafood_item_id") {
+  seafood_item_id: UUID! @col(name: "seafood_item_id")
+  code: String! @unique
+  canonical_name_ms: String!
+  display_name_en: String!
+  scientific_name: String!
+  scientific_name_normalized: String
+  taxonomic_level: String!
+  family: String
+  fish_type: String!
+  description: String!
+  supports_cv: Boolean! @default(value: false)
+  active: Boolean! @default(value: true)
+  primary_image_url: String
+  notes: String
+  created_at: Timestamp! @default(expr: "request.time")
+  updated_at: Timestamp! @default(expr: "request.time")
+}
+
+type SeafoodAlias @table(name: "seafood_alias", key: "seafood_alias_id") {
+  seafood_alias_id: UUID! @col(name: "seafood_alias_id")
+  seafood: SeafoodItem! @ref @col(name: "seafood_item_id")
+  alias_name: String!
+  language_code: String
+  alias_type: SeafoodAliasType!
+  verified: Boolean! @default(value: false)
+}
+
+# ---------------------------------------------------------------------------
+# Provenance
+# ---------------------------------------------------------------------------
+
+type DataSource @table(name: "data_source", key: "data_source_id") {
+  data_source_id: UUID! @col(name: "data_source_id")
+  source_key: String! @unique
+  name: String!
+  owner: String
+  type: String!
+  homepage_url: String
+  license: String
+  active: Boolean! @default(value: true)
+}
+
+type SourceSnapshot @table(name: "source_snapshot", key: "source_snapshot_id") {
+  source_snapshot_id: UUID! @col(name: "source_snapshot_id")
+  data_source: DataSource! @ref @col(name: "data_source_id")
+  version_label: String!
+  source_period_start: Date
+  source_period_end: Date
+  retrieved_at: Timestamp!
+  collection_method: CollectionMethod!
+  manifest: Any
+  notes: String
+}
+
+# ---------------------------------------------------------------------------
+# WWF
+# ---------------------------------------------------------------------------
+
+type WwfAssessment @table(name: "wwf_assessment", key: "wwf_assessment_id") {
+  wwf_assessment_id: UUID! @col(name: "wwf_assessment_id")
+  seafood: SeafoodItem! @ref @col(name: "seafood_item_id")
+  source_snapshot: SourceSnapshot! @ref @col(name: "source_snapshot_id")
+  source_record_key: String!
+  common_name_raw: String!
+  secondary_common_name_raw: String
+  scientific_name_raw: String!
+  rating: SustainabilityRating!
+  origin_raw: String
+  origin_code: String
+  production_type: String
+  production_method_raw: String
+  production_method_code: String
+  certification_raw: String
+  context: String
+  notes_raw: String
+}
+
+# ---------------------------------------------------------------------------
+# PriceCatcher + derived prices + forecast
+# ---------------------------------------------------------------------------
+
+type PricecatcherItem @table(name: "pricecatcher_item", key: "pricecatcher_item_id") {
+  pricecatcher_item_id: UUID! @col(name: "pricecatcher_item_id")
+  source_snapshot: SourceSnapshot! @ref @col(name: "source_snapshot_id")
+  external_item_code: String! @unique
+  official_item_name: String!
+  unit_raw: String!
+  unit_code: String!
+  item_group: String
+  item_category: String
+  product_form: ProductForm!
+  size_descriptor: String
+  active: Boolean! @default(value: true)
+}
+
+type PricecatcherPremise @table(name: "pricecatcher_premise", key: "pricecatcher_premise_id") {
+  pricecatcher_premise_id: UUID! @col(name: "pricecatcher_premise_id")
+  source_snapshot: SourceSnapshot! @ref @col(name: "source_snapshot_id")
+  location: Location! @ref @col(name: "location_id")
+  external_premise_code: String! @unique
+  premise_name: String!
+  retail_class: String!
+  address_raw: String
+  active: Boolean! @default(value: true)
+}
+
+type PriceItemMapping @table(name: "price_item_mapping", key: "price_item_mapping_id") {
+  price_item_mapping_id: UUID! @col(name: "price_item_mapping_id")
+  seafood: SeafoodItem! @ref @col(name: "seafood_item_id")
+  pricecatcher_item: PricecatcherItem! @ref @col(name: "pricecatcher_item_id")
+  mapping_type: PriceMappingType!
+  priority: Int!
+  is_default_for_generic: Boolean! @default(value: false)
+  requires_variant_confirmation: Boolean! @default(value: false)
+  aggregation_rule: AggregationRule! @default(value: SEPARATE)
+  mapping_confidence: MappingConfidence! @default(value: MEDIUM)
+  notes: String
+}
+
+type PricePeriodSummary @table(name: "price_period_summary", key: "price_period_summary_id") {
+  price_period_summary_id: UUID! @col(name: "price_period_summary_id")
+  seafood: SeafoodItem! @ref @col(name: "seafood_item_id")
+  location: Location! @ref @col(name: "location_id")
+  source_snapshot: SourceSnapshot! @ref @col(name: "source_snapshot_id")
+  location_level: LocationLevel!
+  period_type: PeriodType!
+  period_start: Date!
+  period_end: Date!
+  median_price: Float!
+  average_price: Float
+  min_price: Float
+  max_price: Float
+  p25_price: Float
+  p75_price: Float
+  observation_count: Int!
+  premise_count: Int!
+  distinct_day_count: Int!
+  quality_status: PriceQuality!
+  calculation_version: String!
+  calculated_at: Timestamp!
+}
+
+type PriceTrendPoint @table(name: "price_trend_point", key: "price_trend_point_id") {
+  price_trend_point_id: UUID! @col(name: "price_trend_point_id")
+  seafood: SeafoodItem! @ref @col(name: "seafood_item_id")
+  location: Location! @ref @col(name: "location_id")
+  source_snapshot: SourceSnapshot! @ref @col(name: "source_snapshot_id")
+  week_start: Date!
+  weekly_median_price: Float!
+  observation_count: Int!
+  premise_count: Int!
+  active_days: Int!
+  quality_status: PriceQuality!
+  calculation_version: String!
+  created_at: Timestamp! @default(expr: "request.time")
+}
+
+type ForecastModelVersion @table(name: "forecast_model_version", key: "forecast_model_version_id") {
+  forecast_model_version_id: UUID! @col(name: "forecast_model_version_id")
+  version_name: String! @unique
+  algorithm: String!
+  training_window_start: Date
+  training_window_end: Date
+  validation_mae: Float
+  validation_rmse: Float
+  validation_mape: Float
+  interval_level: Float
+  configuration: Any
+  active: Boolean! @default(value: false)
+  created_at: Timestamp! @default(expr: "request.time")
+}
+
+type PriceForecast @table(name: "price_forecast", key: "price_forecast_id") {
+  price_forecast_id: UUID! @col(name: "price_forecast_id")
+  seafood: SeafoodItem! @ref @col(name: "seafood_item_id")
+  location: Location! @ref @col(name: "location_id")
+  forecast_model_version: ForecastModelVersion! @ref @col(name: "forecast_model_version_id")
+  forecast_week_start: Date!
+  expected_price: Float!
+  lower_bound: Float!
+  upper_bound: Float!
+  outlook: String
+  generated_at: Timestamp! @default(expr: "request.time")
+}
+
+# ---------------------------------------------------------------------------
+# Supply, cooking, CV, recipes
+# ---------------------------------------------------------------------------
+
+type SupplyLandingPoint @table(name: "supply_landing_point", key: "supply_landing_point_id") {
+  supply_landing_point_id: UUID! @col(name: "supply_landing_point_id")
+  source_snapshot: SourceSnapshot! @ref @col(name: "source_snapshot_id")
+  period_month: Date!
+  scope_level: String!
+  coast_code: String!
+  state_name: String!
+  landings_mt: Float!
+  created_at: Timestamp!
+}
+
+type CookingMethod @table(name: "cooking_method", key: "cooking_method_id") {
+  cooking_method_id: UUID! @col(name: "cooking_method_id")
+  code: String! @unique
+  name_en: String!
+  name_ms: String
+  description_en: String
+}
+
+type CookingSuitability @table(name: "cooking_suitability", key: "cooking_suitability_id") {
+  cooking_suitability_id: UUID! @col(name: "cooking_suitability_id")
+  seafood: SeafoodItem! @ref @col(name: "seafood_item_id")
+  cooking_method: CookingMethod! @ref @col(name: "cooking_method_id")
+  source_snapshot: SourceSnapshot @ref @col(name: "source_snapshot_id")
+  suitability_score: Int
+  reason_en: String!
+  reason_ms: String
+  updated_at: Timestamp!
+}
+
+type CvModelVersion @table(name: "cv_model_version", key: "cv_model_version_id") {
+  cv_model_version_id: UUID! @col(name: "cv_model_version_id")
+  version_name: String! @unique
+  input_contract: Any!
+  metrics: Any!
+  confidence_threshold: Float
+  active: Boolean! @default(value: false)
+}
+
+type CvClassMapping @table(name: "cv_class_mapping", key: "cv_class_mapping_id") {
+  cv_class_mapping_id: UUID! @col(name: "cv_class_mapping_id")
+  cv_model_version: CvModelVersion! @ref @col(name: "cv_model_version_id")
+  seafood: SeafoodItem! @ref @col(name: "seafood_item_id")
+  model_class_label: String!
+  model_class_index: Int!
+}
+
+type Recipe @table(name: "recipe", key: "recipe_id") {
+  recipe_id: UUID! @col(name: "recipe_id")
+  source_snapshot: SourceSnapshot! @ref @col(name: "source_snapshot_id")
+  external_recipe_id: String!
+  title: String!
+  description: String
+  ingredients_json: Any!
+  instructions_json: Any!
+  prep_time_minutes: Int
+  cook_time_minutes: Int
+  total_time_minutes: Int
+  servings: Float
+  cuisine: String
+  nutrition_json: Any
+  source_url: String
+  created_at: Timestamp!
+}
+
+type RecipeSeafoodMapping @table(name: "recipe_seafood_mapping", key: "recipe_seafood_mapping_id") {
+  recipe_seafood_mapping_id: UUID! @col(name: "recipe_seafood_mapping_id")
+  recipe: Recipe! @ref @col(name: "recipe_id")
+  seafood: SeafoodItem! @ref @col(name: "seafood_item_id")
+  mapping_type: RecipeMappingType!
+  notes: String
+  created_at: Timestamp!
+}
+
+type RecipeCookingMethod @table(name: "recipe_cooking_method", key: "recipe_cooking_method_id") {
+  recipe_cooking_method_id: UUID! @col(name: "recipe_cooking_method_id")
+  recipe: Recipe! @ref @col(name: "recipe_id")
+  cooking_method: CookingMethod! @ref @col(name: "cooking_method_id")
+  source_method_text: String
+  notes: String
+}
+
+type AppUser @table(name: "app_user", key: "id") {
+  id: UUID! @default(expr: "uuidV4()")
+  name: String!
+  email: String!
+  password_hash: String!
+  created_at: Timestamp! @default(expr: "request.time")
+  updated_at: Timestamp! @default(expr: "request.time")
+}

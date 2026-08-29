@@ -127,6 +127,7 @@ createdb -h localhost -U sukaseafood sukaseafood_test    # once
 TEST_DATABASE_URL=postgresql+asyncpg://sukaseafood:sukaseafood@localhost:5432/sukaseafood_test pytest
 ```
 
-`tests/test_schema.py` asserts structural invariants — all 17 tables and 8 enums
-exist, the ORM covers every table, `suka_uuid5` matches Python's `uuid5`, and
-`sustainability_rating_enum` still has no UNDETERMINED member.
+`tests/test_schema.py` asserts structural invariants — all 21 domain tables +
+`app_user` and 11 enums exist, the ORM covers every table, `suka_uuid5` matches
+Python's `uuid5`, and `sustainability_rating_enum` still has no UNDETERMINED
+member.

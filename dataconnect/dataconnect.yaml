@@ -8,6 +8,7 @@ schemas:
         database: "sukaseafood-654b7-database"
         cloudSql:
           instanceId: "sukaseafood-654b7-instance"
-          # schemaValidation: "STRICT"     # STRICT mode makes Postgres schema match Data Connect exactly.
-          # schemaValidation: "COMPATIBLE" # COMPATIBLE mode makes Postgres schema compatible with Data Connect.
+          # SQL DDL in backend/db/schema is the source of truth for V3.
+          # COMPATIBLE lets Firebase expose that schema without rewriting it.
+          schemaValidation: "COMPATIBLE"
 connectorDirs: ["./example"]

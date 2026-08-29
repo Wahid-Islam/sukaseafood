@@ -22,7 +22,7 @@ from sqlalchemy import engine_from_config, pool
 from app.config import get_settings
 from app.database import Base
 
-# Importing the models package registers all 17 tables on Base.metadata.
+# Importing the models package registers all V3 domain tables on Base.metadata.
 import app.models  # noqa: F401
 
 config = context.config

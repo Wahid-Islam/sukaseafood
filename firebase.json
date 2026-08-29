@@ -3,7 +3,9 @@
     "Firebase: Hosting + Storage for delivery only. No Firestore.",
     "Accounts + seafood domain live in PostgreSQL (local Docker or Cloud SQL).",
     "SQL Connect Cloud SQL: sukaseafood-654b7-instance (us-east4) — Blaze trial.",
-    "Schema source of truth: backend/db/schema (apply.sh).",
+    "Schema contract: Database Schema V3 (seafood_item hub).",
+    "Schema source of truth: backend/db/schema/v3_*.sql (apply.sh).",
+    "GraphQL mirror: dataconnect/schema/schema.gql (COMPATIBLE validation).",
     "",
     "Hosting serves Flutter web and can proxy /api/** to Cloud Run FastAPI.",
     "Deploy web: flutter build web --release (frontend/) then firebase deploy"

@@ -26,14 +26,15 @@ This prevents divergent records between camera identification and typed search.
 ```
 ┌────────────┐   HTTPS/JSON   ┌─────────────────┐   asyncpg   ┌──────────────────┐
 │  Flutter   │ ────────────── │  FastAPI /v1    │ ─────────── │  PostgreSQL 16   │
-│  frontend  │                │  seafood domain │             │  17-table schema │
+│  frontend  │                │  seafood domain │             │  V3 schema       │
 └─────┬──────┘                └─────────────────┘             └──────────────────┘
       │                                                        system of record
       │ images
       ▼
 ┌──────────────────┐
 │ Firebase         │
-│ Hosting + Storage│   delivery only — no domain data
+│ Hosting+Storage  │   delivery
+│ SQL Connect      │   GraphQL mirror of Cloud SQL (V3)
 └──────────────────┘
 ```
 
@@ -46,16 +47,20 @@ enum constraints, expression indexes and transactional imports — so the schema
 uses them, and there is no SQLite or document-store fallback that would quietly
 accept data the production database would reject.
 
-### Why Firebase holds no domain data
+### Schema V3 (canonical hub)
 
-Firebase serves bytes and delivery: Hosting for the Flutter web build (with
-`/api/**` rewritten to the backend, so the client makes same-origin requests),
-and Storage for seafood imagery. Nothing the app *asserts* is stored there.
+`seafood_item_id` is the only application-wide seafood ID. PriceCatcher codes,
+WWF source rows, premise codes and CV labels resolve through mapping tables.
+Derived price outputs (`price_period_summary`, `price_trend_point`) are keyed by
+`seafood_item_id`. Forecasts and observed prices are separate tables.
 
-`seafood_item` therefore has no `image_url` column — an image's location is
-derived from the species code (`SF001` → `seafood/SF001.jpg`), so replacing
-artwork is a file upload rather than a database migration, and a missing file
-degrades to no image rather than a broken link.
+### Why Firebase holds no domain assertions
+
+Firebase Hosting serves the Flutter web build; Storage holds imagery;
+SQL Connect exposes the Cloud SQL schema via GraphQL. Domain writes still go
+through FastAPI + PostgreSQL. Optional `seafood_item.primary_image_url` can
+point at a canonical asset; when null the API falls back to Storage paths
+derived from `code` (`SF001` → `seafood/SF001.jpg`).
 
 Future adapters (non-breaking):
 
@@ -75,7 +80,7 @@ cannot fake its way past them:
 | State | How the database expresses it |
 | --- | --- |
 | **Undetermined** sustainability | No `wwf_assessment` row. `sustainability_rating_enum` has no UNDETERMINED member, so an unassessed species can never be stored as if it had been assessed. |
-| **Insufficient** price data | `price_summary.quality_status` is derived from observation, premise and distinct-day counts. Anything but `DISPLAYABLE` must not be rendered as a number. |
+| **Insufficient** price data | `price_period_summary.quality_status` is derived from observation, premise and distinct-day counts. Anything but `DISPLAYABLE` must not be rendered as a number. |
 | **Unavailable** supply context | `supply_landing_point` has no species dimension. Landings data is not species-resolved, so attaching it to one fish would invent a fact. |
 
 Never invent WWF scores or prices to fill a gap in the UI.

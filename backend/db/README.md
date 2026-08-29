@@ -2,21 +2,24 @@
 
 PostgreSQL 14+ is the **system of record** for SukaSeafood. Everything the app
 displays — species, aliases, WWF ratings, prices, cooking guidance and the
-provenance behind each — lives here. Firebase stores images and serves the web
-build; it holds no domain data.
+provenance behind each — lives here. Firebase Hosting/Storage deliver the web
+build and images; Firebase SQL Connect points at the same Cloud SQL instance
+that holds this schema.
 
 ## Layout
 
 ```
 backend/db/
 ├── schema/
-│   ├── i1_initial_schema.sql      17 tables + 8 enums (the reviewed handoff DDL)
-│   └── i1_functions_indexes.sql   suka_uuid5(), natural keys, read-path indexes
+│   ├── v3_initial_schema.sql      21 domain tables + 11 enums (V3 contract)
+│   ├── v3_migrate_from_i1.sql     upgrades an existing I1 database to V3
+│   ├── v3_functions_indexes.sql   suka_uuid5() + operational indexes
+│   └── i1_app_user.sql            app accounts (PostgreSQL only)
 ├── seed/
 │   ├── 01_locations.sql           16 states + 178 districts
 │   ├── 02_data_sources.sql        publishers + dated source snapshots
 │   ├── 03_cooking_methods.sql     cooking vocabulary
-│   └── 04_seafood_i1.sql          5 species, aliases, WWF ratings, cooking
+│   └── 04_seafood_i1.sql          5 species + aliases + WWF + cooking
 ├── docker-initdb/                 runs automatically on a fresh Docker volume
 ├── apply.sh                       apply everything to any database
 └── verify.sql                     post-apply checks
@@ -51,60 +54,63 @@ Or from the backend, through Alembic:
 
 ```bash
 cd backend
-alembic upgrade head              # schema only
+alembic upgrade head              # schema only (includes 0003_v3_schema)
 python -c "import asyncio; from app.seed import apply_seed; asyncio.run(apply_seed())"
 ```
 
-## Design decisions worth knowing
+## V3 design decisions
 
-**Deterministic primary keys.** Reference rows use `suka_uuid5('seafood_item:SF001')`
-rather than `gen_random_uuid()`, so every environment — local, CI, Supabase —
-produces the same ids. `price_summary` and `price_trend_point` reference
-`location_id`, so stable keys let price rollups be rebuilt or moved between
-environments without remapping. The function is byte-compatible with Python's
-`uuid.uuid5`, which lets SQL seeds and Python ETL agree on keys with no
-coordination.
+**Canonical hub.** `seafood_item_id` is the only application-wide seafood ID.
+PriceCatcher item codes, WWF source rows, premise codes and CV labels are never
+canonical.
+
+**Derived price layer.** `price_period_summary` and `price_trend_point` are keyed
+by `seafood_item_id` so a fish page can aggregate multiple legitimate
+PriceCatcher variants. Observed prices stay separate from `price_forecast`.
+
+**WWF is one-to-many.** One fish can have multiple assessments (catch method /
+origin context). The product must not collapse them into a single arbitrary
+rating.
+
+**Feature availability is derived.** A master seafood may have WWF but no
+PriceCatcher mapping (or vice versa). Missing data is an explicit product state.
+
+**Deterministic primary keys.** Reference rows use `suka_uuid5(...)` so every
+environment produces the same ids.
 
 **No UNDETERMINED rating.** `sustainability_rating_enum` is
-`BEST_CHOICE | REDUCE | AVOID`. A species we cannot rate has **no
-`wwf_assessment` row**, and the API surfaces that as UNDETERMINED. Kerapu Bintik
-(SF005) is seeded this way on purpose. Making UNDETERMINED a rating value would
-erase the difference between "assessed and unclear" and "never assessed".
+`BEST_CHOICE | REDUCE | AVOID`. Unrated species have no `wwf_assessment` row.
 
-**Snapshots, not overwrites.** Every fact table points at a `source_snapshot` —
-one dated extract from one publisher. Importing newer data adds rows; it never
-mutates the evidence behind a number a user has already been shown.
-
-**Quality gates on price.** `price_summary` carries `observation_count`,
-`premise_count` and `distinct_day_count`, and `quality_status` is derived from
-them. Anything not `DISPLAYABLE` must be shown as "insufficient data" — a median
-of three observations from one shop is worse than no number.
-
-**Case-insensitive aliases.** Uniqueness and search both run on
-`LOWER(TRIM(alias_name))`. Two aliases for the same species differing only in
-case are the same alias.
+**Snapshots, not overwrites.** Fact tables point at a `source_snapshot`. Soft
+delete uses `active = FALSE` where applicable. Timestamps are UTC.
 
 ## Tables
 
 | # | Table | Holds |
 |---|---|---|
-| 1 | `location` | States and districts; districts parent to their state |
-| 2 | `seafood_item` | Canonical species — the hub of the domain |
-| 3 | `seafood_alias` | Every spelling search must resolve |
-| 4 | `data_source` | Publishers (WWF, OpenDOSM, team, CV model) |
-| 5 | `source_snapshot` | One dated extract from a publisher |
-| 6 | `wwf_assessment` | Sustainability ratings, with raw source wording |
-| 7 | `pricecatcher_item` | Items as OpenDOSM defines them |
-| 8 | `price_item_mapping` | Species → PriceCatcher item, with priority |
-| 9 | `price_summary` | 30/90-day median rollups + quality gate |
-| 10 | `price_trend_point` | Weekly medians for the 12-week chart |
-| 11 | `supply_landing_point` | Monthly landings; no species dimension by design |
-| 12 | `cooking_method` | Cooking vocabulary |
-| 13 | `cooking_suitability` | Species × method score 1–5 with a reason |
-| 14 | `cv_model_version` | Deployed CV models + their thresholds |
-| 15 | `recipe` | Imported recipes (JSONB ingredients/instructions) |
-| 16 | `recipe_seafood_mapping` | Recipe → species |
-| 17 | `recipe_cooking_method` | Recipe → cooking method |
+| 1 | `location` | States and districts |
+| 2 | `seafood_item` | Canonical seafood hub |
+| 3 | `seafood_alias` | Search vocabulary |
+| 4 | `data_source` | Publishers |
+| 5 | `source_snapshot` | Dated extracts |
+| 6 | `wwf_assessment` | Context-dependent sustainability |
+| 7 | `pricecatcher_item` | Official PriceCatcher items |
+| 8 | `pricecatcher_premise` | Official premises + retail class |
+| 9 | `price_item_mapping` | Canonical ↔ PriceCatcher bridge |
+| 10 | `price_period_summary` | Week/month/quarter rollups by seafood |
+| 11 | `price_trend_point` | Weekly medians by seafood |
+| 12 | `forecast_model_version` | ETS model identity + metrics |
+| 13 | `price_forecast` | Expected range + outlook |
+| 14 | `supply_landing_point` | Landings (no species dimension) |
+| 15 | `cooking_method` | Cooking vocabulary |
+| 16 | `cooking_suitability` | Species × method score |
+| 17 | `cv_model_version` | Deployed CV models |
+| 18 | `cv_class_mapping` | Model label → seafood_item_id |
+| 19 | `recipe` | Imported recipes |
+| 20 | `recipe_seafood_mapping` | Recipe → species |
+| 21 | `recipe_cooking_method` | Recipe → cooking method |
 
-Tables 7–11, 14–17 are **empty until the ETL runs**. That is expected, not a
-failure: `verify.sql` says so explicitly.
+Plus `app_user` for mobile accounts.
+
+Price/forecast/CV/recipe ETL tables are **empty until the pipeline runs**.
+`verify.sql` says so explicitly.
