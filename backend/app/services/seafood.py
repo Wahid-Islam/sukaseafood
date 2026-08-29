@@ -1,6 +1,6 @@
 """Seafood domain services.
 
-These functions translate the 17-table Postgres model into the API contract the
+These functions translate the V3 Postgres model into the API contract the
 Flutter client already consumes. The response shapes in app/schemas are
 UNCHANGED — the client keeps sending `fish_id`; it is now `seafood_item.code`
 (SF001…) rather than a hand-written slug.
@@ -27,15 +27,14 @@ from app.config import get_settings
 from app.models import (
     CookingMethod,
     CookingSuitability,
-    PriceItemMapping,
-    PriceSummary,
+    PricePeriodSummary,
     PriceTrendPoint,
     SeafoodAlias,
     SeafoodItem,
     SupplyLandingPoint,
     WwfAssessment,
 )
-from app.models.enums import PriceQuality, SustainabilityRating
+from app.models.enums import PeriodType, PriceQuality, SustainabilityRating
 from app.schemas import (
     AliasOut,
     CookingSuitabilityOut,
@@ -119,29 +118,14 @@ def _assessment_loader():
     )
 
 
-# The schema stores taxonomic family, which is precise but means nothing to a
-# shopper standing at a stall. These labels answer the question they actually
-# have — where does this fish live, and is it farmed? — without adding a column
-# that would need curating for every future species.
-FAMILY_LABELS: dict[str, str] = {
-    "Scombridae": "Pelagic fish",
-    "Carangidae": "Demersal fish",
-    "Lutjanidae": "Reef / demersal fish",
-    "Serranidae": "Grouper / reef fish",
-    "Cichlidae": "Farmed freshwater fish",
-    "Clupeidae": "Pelagic fish",
-    "Sciaenidae": "Demersal fish",
-    "Latidae": "Coastal / farmed fish",
-    "Penaeidae": "Prawn",
-    "Portunidae": "Crab",
-}
-
-
 def _fish_type(item: SeafoodItem) -> str:
-    """Shopper-facing type label, falling back to the taxonomic family."""
-    if not item.family:
-        return "Seafood"
-    return FAMILY_LABELS.get(item.family, item.family)
+    """Shopper-facing type label from the V3 fish_type column."""
+    return item.fish_type or item.family or "Seafood"
+
+
+def _image_url(item: SeafoodItem) -> str | None:
+    """Prefer the canonical primary_image_url; fall back to Firebase Storage."""
+    return item.primary_image_url or firebase.image_url(item.code)
 
 
 # --- reads -------------------------------------------------------------------
@@ -249,7 +233,7 @@ def to_summary(item: SeafoodItem) -> SeafoodSummaryOut:
         scientific_name=item.scientific_name,
         primary_common_name=item.canonical_name_ms,
         fish_type=_fish_type(item),
-        image_url=firebase.image_url(item.code),
+        image_url=_image_url(item),
         classification=RATING_LABELS[assessment.rating] if assessment else UNDETERMINED,
     )
 
@@ -270,11 +254,12 @@ def to_sustainability(item: SeafoodItem) -> SustainabilityOut:
             verified=False,
         )
 
+    explanation = assessment.context or assessment.notes_raw or ""
     return SustainabilityOut(
         classification=RATING_LABELS[assessment.rating],
         origin=assessment.origin_raw or "Malaysia",
         production_method=assessment.production_method_raw or "",
-        explanation=assessment.notes_raw or "",
+        explanation=explanation,
         why_it_matters=WHY_IT_MATTERS[assessment.rating],
         source_name="WWF Save Our Seafood",
         source_url="https://www.saveourseafood.my/",
@@ -296,8 +281,8 @@ async def build_profile(session: AsyncSession, item: SeafoodItem) -> SeafoodProf
         fish_type=_fish_type(item),
         common_in="Malaysia",
         market_availability="Year-round",
-        about=item.notes or "",
-        image_url=firebase.image_url(item.code),
+        about=item.description or item.notes or "",
+        image_url=_image_url(item),
         aliases=[
             AliasOut(alias=a.alias_name, language=a.language_code or "ms")
             for a in sorted(item.aliases, key=lambda a: a.alias_name)
@@ -366,10 +351,8 @@ async def get_supply_context(session: AsyncSession) -> SupplyContextOut | None:
 async def get_price_context(session: AsyncSession, fish_id: str) -> PriceContextOut:
     """Observed price context for one species.
 
-    Walks species -> price_item_mapping -> pricecatcher_item -> price_summary,
-    taking the highest-priority mapping. Anything not marked DISPLAYABLE is
-    reported as insufficient data; a median from three observations in one shop
-    is worse than no number at all.
+    V3 keys derived price outputs by seafood_item_id (not PriceCatcher item
+    code). Anything not marked DISPLAYABLE is reported as insufficient data.
     """
     item = await get_seafood_by_id(session, fish_id)
     if item is None:
@@ -382,28 +365,11 @@ async def get_price_context(session: AsyncSession, fish_id: str) -> PriceContext
             disclaimer=PRICE_DISCLAIMER,
         )
 
-    mapping = await session.scalar(
-        select(PriceItemMapping)
-        .where(PriceItemMapping.seafood_item_id == item.seafood_item_id)
-        .order_by(PriceItemMapping.priority)
-        .limit(1)
-    )
-
-    if mapping is None:
-        return PriceContextOut(
-            fish_id=item.code,
-            latest_price_rm_per_kg=None,
-            status="No PriceCatcher mapping",
-            change_vs_recent_pct=None,
-            history=[],
-            disclaimer=PRICE_DISCLAIMER,
-        )
-
     summary = await session.scalar(
-        select(PriceSummary)
-        .where(PriceSummary.pricecatcher_item_id == mapping.pricecatcher_item_id)
-        .where(PriceSummary.window_days == 30)
-        .order_by(PriceSummary.period_end.desc())
+        select(PricePeriodSummary)
+        .where(PricePeriodSummary.seafood_item_id == item.seafood_item_id)
+        .where(PricePeriodSummary.period_type == PeriodType.MONTH)
+        .order_by(PricePeriodSummary.period_end.desc())
         .limit(1)
     )
 
@@ -420,7 +386,7 @@ async def get_price_context(session: AsyncSession, fish_id: str) -> PriceContext
     trend = list(
         await session.scalars(
             select(PriceTrendPoint)
-            .where(PriceTrendPoint.pricecatcher_item_id == mapping.pricecatcher_item_id)
+            .where(PriceTrendPoint.seafood_item_id == item.seafood_item_id)
             .where(PriceTrendPoint.location_id == summary.location_id)
             .where(PriceTrendPoint.quality_status == PriceQuality.DISPLAYABLE)
             .order_by(PriceTrendPoint.week_start.desc())
@@ -430,10 +396,10 @@ async def get_price_context(session: AsyncSession, fish_id: str) -> PriceContext
     trend.reverse()
 
     change_pct = None
-    if len(trend) >= 2 and trend[0].weekly_median:
+    if len(trend) >= 2 and trend[0].weekly_median_price:
         change_pct = round(
-            float(trend[-1].weekly_median - trend[0].weekly_median)
-            / float(trend[0].weekly_median)
+            float(trend[-1].weekly_median_price - trend[0].weekly_median_price)
+            / float(trend[0].weekly_median_price)
             * 100,
             1,
         )
@@ -446,7 +412,7 @@ async def get_price_context(session: AsyncSession, fish_id: str) -> PriceContext
         history=[
             PricePointOut(
                 observed_date=p.week_start,
-                price_rm_per_kg=float(p.weekly_median),
+                price_rm_per_kg=float(p.weekly_median_price),
                 premise_state="",
                 premise_type="",
                 note=f"Weekly median of {p.observation_count} observations",

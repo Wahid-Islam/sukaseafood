@@ -1,28 +1,18 @@
--- DEPRECATED — kept for Alembic revision 0001 history only.
--- Active schema contract is V3: see v3_initial_schema.sql
+-- SukaSeafood Database Schema V3
+-- PostgreSQL DDL — structure only.
 --
--- SukaSeafood Iteration 1
--- PostgreSQL schema — DDL only (17 tables, 8 enums).
+-- Canonical contract: seafood_item is the hub. Source-specific and feature-
+-- specific records are spokes. External IDs (PriceCatcher item_code,
+-- premise_code, WWF source rows, CV labels) are NEVER the application
+-- canonical seafood ID.
 --
--- Source of truth for the I1 "Database & Data Structure Design" handoff.
--- Runs against a fresh/empty schema on PostgreSQL 14+ (local Docker or Supabase).
+-- Apply order (see apply.sh / docker-initdb):
+--   1. schema/v3_initial_schema.sql      <- this file
+--   2. schema/v3_functions_indexes.sql
+--   3. schema/i1_app_user.sql            <- app accounts (unchanged)
+--   4. seed/*.sql
 --
--- This file creates STRUCTURE ONLY. Reference and canonical data live in
--- ../seed/*.sql and are applied after this file, in filename order:
---
---   1. schema/i1_initial_schema.sql     <- this file (tables, enums, indexes)
---   2. schema/i1_functions_indexes.sql  <- suka_uuid5() + operational constraints
---   3. seed/01_locations.sql            <- Malaysian states + districts
---   4. seed/02_data_sources.sql         <- data_source + source_snapshot
---   5. seed/03_cooking_methods.sql      <- cooking_method vocabulary
---   6. seed/04_seafood_i1.sql           <- the 5 I1 species + aliases
---
--- Apply everything at once with:  backend/db/apply.sh
---
--- I1 originally shipped anonymous (no auth tables). App accounts now live in
--- schema/i1_app_user.sql (PostgreSQL only — not Firestore).
--- Business rules (WWF clarification, PriceCatcher fallback)
--- live in FastAPI, not in database triggers.
+-- Idempotent: safe to re-run on an empty or partially-applied database.
 
 BEGIN;
 
@@ -65,13 +55,37 @@ END $$;
 
 DO $$ BEGIN
   CREATE TYPE price_mapping_type_enum AS ENUM
-    ('EXACT', 'COMMON_NAME', 'MARKET_VARIANT', 'MARKET_GROUP');
+    ('EXACT', 'COMMON_NAME', 'MARKET_VARIANT', 'MARKET_GROUP', 'PROXY');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+-- Add PROXY if upgrading from I1 enum that lacked it.
+DO $$ BEGIN
+  ALTER TYPE price_mapping_type_enum ADD VALUE IF NOT EXISTS 'PROXY';
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE aggregation_rule_enum AS ENUM
+    ('SEPARATE', 'COMBINE', 'DEFAULT_ONLY', 'PROXY');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE mapping_confidence_enum AS ENUM
+    ('HIGH', 'MEDIUM', 'LOW');
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
 DO $$ BEGIN
   CREATE TYPE price_quality_enum AS ENUM
     ('DISPLAYABLE', 'INSUFFICIENT_DATA', 'REJECTED');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE period_type_enum AS ENUM
+    ('WEEK', 'MONTH', 'QUARTER');
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
@@ -87,7 +101,7 @@ END $$;
 
 CREATE TABLE IF NOT EXISTS location (
   location_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  parent_location_id UUID REFERENCES location(location_id),
+  parent_location_id UUID REFERENCES location(location_id) ON DELETE RESTRICT,
   level location_level_enum NOT NULL,
   state_name TEXT NOT NULL,
   district_name TEXT,
@@ -95,7 +109,7 @@ CREATE TABLE IF NOT EXISTS location (
 );
 
 -- =========================================================
--- 2. seafood_item
+-- 2. seafood_item  (canonical hub)
 -- =========================================================
 
 CREATE TABLE IF NOT EXISTS seafood_item (
@@ -103,11 +117,18 @@ CREATE TABLE IF NOT EXISTS seafood_item (
   code TEXT NOT NULL UNIQUE,
   canonical_name_ms TEXT NOT NULL,
   display_name_en TEXT NOT NULL,
-  scientific_name TEXT NOT NULL UNIQUE,
+  scientific_name TEXT NOT NULL,
+  scientific_name_normalized TEXT,
+  taxonomic_level TEXT NOT NULL,
   family TEXT,
-  supports_cv BOOLEAN NOT NULL,
+  fish_type TEXT NOT NULL,
+  description TEXT NOT NULL,
+  supports_cv BOOLEAN NOT NULL DEFAULT FALSE,
   active BOOLEAN NOT NULL DEFAULT TRUE,
-  notes TEXT
+  primary_image_url TEXT,
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- =========================================================
@@ -116,18 +137,17 @@ CREATE TABLE IF NOT EXISTS seafood_item (
 
 CREATE TABLE IF NOT EXISTS seafood_alias (
   seafood_alias_id UUID PRIMARY KEY,
-  seafood_item_id UUID NOT NULL REFERENCES seafood_item(seafood_item_id),
+  seafood_item_id UUID NOT NULL
+    REFERENCES seafood_item(seafood_item_id) ON DELETE RESTRICT,
   alias_name TEXT NOT NULL,
   language_code TEXT,
   alias_type seafood_alias_type_enum NOT NULL,
-  verified BOOLEAN NOT NULL
+  verified BOOLEAN NOT NULL DEFAULT FALSE
 );
 
--- Search index requested by the final design.
 CREATE INDEX IF NOT EXISTS idx_seafood_alias_search
   ON seafood_alias (LOWER(TRIM(alias_name)));
 
--- Keep aliases unique per seafood using the same normalised search expression.
 CREATE UNIQUE INDEX IF NOT EXISTS uq_seafood_alias_per_seafood
   ON seafood_alias (seafood_item_id, LOWER(TRIM(alias_name)));
 
@@ -152,7 +172,8 @@ CREATE TABLE IF NOT EXISTS data_source (
 
 CREATE TABLE IF NOT EXISTS source_snapshot (
   source_snapshot_id UUID PRIMARY KEY,
-  data_source_id UUID NOT NULL REFERENCES data_source(data_source_id),
+  data_source_id UUID NOT NULL
+    REFERENCES data_source(data_source_id) ON DELETE RESTRICT,
   version_label TEXT NOT NULL,
   source_period_start DATE,
   source_period_end DATE,
@@ -163,15 +184,18 @@ CREATE TABLE IF NOT EXISTS source_snapshot (
 );
 
 -- =========================================================
--- 6. wwf_assessment
+-- 6. wwf_assessment  (1:N from seafood_item — context-dependent ratings)
 -- =========================================================
 
 CREATE TABLE IF NOT EXISTS wwf_assessment (
   wwf_assessment_id UUID PRIMARY KEY,
-  seafood_item_id UUID NOT NULL REFERENCES seafood_item(seafood_item_id),
-  source_snapshot_id UUID NOT NULL REFERENCES source_snapshot(source_snapshot_id),
+  seafood_item_id UUID NOT NULL
+    REFERENCES seafood_item(seafood_item_id) ON DELETE RESTRICT,
+  source_snapshot_id UUID NOT NULL
+    REFERENCES source_snapshot(source_snapshot_id) ON DELETE RESTRICT,
   source_record_key TEXT NOT NULL,
   common_name_raw TEXT NOT NULL,
+  secondary_common_name_raw TEXT,
   scientific_name_raw TEXT NOT NULL,
   rating sustainability_rating_enum NOT NULL,
   origin_raw TEXT,
@@ -180,9 +204,10 @@ CREATE TABLE IF NOT EXISTS wwf_assessment (
   production_method_raw TEXT,
   production_method_code TEXT,
   certification_raw TEXT,
-  notes_raw TEXT
+  context TEXT,
+  notes_raw TEXT,
+  UNIQUE (source_snapshot_id, source_record_key)
 );
-
 
 -- =========================================================
 -- 7. pricecatcher_item
@@ -190,7 +215,8 @@ CREATE TABLE IF NOT EXISTS wwf_assessment (
 
 CREATE TABLE IF NOT EXISTS pricecatcher_item (
   pricecatcher_item_id UUID PRIMARY KEY,
-  source_snapshot_id UUID NOT NULL REFERENCES source_snapshot(source_snapshot_id),
+  source_snapshot_id UUID NOT NULL
+    REFERENCES source_snapshot(source_snapshot_id) ON DELETE RESTRICT,
   external_item_code TEXT NOT NULL UNIQUE,
   official_item_name TEXT NOT NULL,
   unit_raw TEXT NOT NULL,
@@ -203,35 +229,62 @@ CREATE TABLE IF NOT EXISTS pricecatcher_item (
 );
 
 -- =========================================================
--- 8. price_item_mapping
+-- 8. pricecatcher_premise
+-- =========================================================
+
+CREATE TABLE IF NOT EXISTS pricecatcher_premise (
+  pricecatcher_premise_id UUID PRIMARY KEY,
+  source_snapshot_id UUID NOT NULL
+    REFERENCES source_snapshot(source_snapshot_id) ON DELETE RESTRICT,
+  location_id UUID NOT NULL
+    REFERENCES location(location_id) ON DELETE RESTRICT,
+  external_premise_code TEXT NOT NULL UNIQUE,
+  premise_name TEXT NOT NULL,
+  retail_class TEXT NOT NULL,
+  address_raw TEXT,
+  active BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+-- =========================================================
+-- 9. price_item_mapping  (canonical seafood ↔ PriceCatcher item)
 -- =========================================================
 
 CREATE TABLE IF NOT EXISTS price_item_mapping (
   price_item_mapping_id UUID PRIMARY KEY,
-  seafood_item_id UUID NOT NULL REFERENCES seafood_item(seafood_item_id),
-  pricecatcher_item_id UUID NOT NULL REFERENCES pricecatcher_item(pricecatcher_item_id),
+  seafood_item_id UUID NOT NULL
+    REFERENCES seafood_item(seafood_item_id) ON DELETE RESTRICT,
+  pricecatcher_item_id UUID NOT NULL
+    REFERENCES pricecatcher_item(pricecatcher_item_id) ON DELETE RESTRICT,
   mapping_type price_mapping_type_enum NOT NULL,
   priority SMALLINT NOT NULL CHECK (priority > 0),
-  is_default_for_generic BOOLEAN NOT NULL,
-  requires_variant_confirmation BOOLEAN NOT NULL,
+  is_default_for_generic BOOLEAN NOT NULL DEFAULT FALSE,
+  requires_variant_confirmation BOOLEAN NOT NULL DEFAULT FALSE,
+  aggregation_rule aggregation_rule_enum NOT NULL DEFAULT 'SEPARATE',
+  mapping_confidence mapping_confidence_enum NOT NULL DEFAULT 'MEDIUM',
   notes TEXT,
   UNIQUE (seafood_item_id, pricecatcher_item_id)
 );
 
 -- =========================================================
--- 9. price_summary
+-- 10. price_period_summary  (keyed by seafood_item_id — derived layer)
 -- =========================================================
 
-CREATE TABLE IF NOT EXISTS price_summary (
-  price_summary_id UUID PRIMARY KEY,
-  pricecatcher_item_id UUID NOT NULL REFERENCES pricecatcher_item(pricecatcher_item_id),
-  location_id UUID NOT NULL REFERENCES location(location_id),
-  source_snapshot_id UUID NOT NULL REFERENCES source_snapshot(source_snapshot_id),
+CREATE TABLE IF NOT EXISTS price_period_summary (
+  price_period_summary_id UUID PRIMARY KEY,
+  seafood_item_id UUID NOT NULL
+    REFERENCES seafood_item(seafood_item_id) ON DELETE RESTRICT,
+  location_id UUID NOT NULL
+    REFERENCES location(location_id) ON DELETE RESTRICT,
+  source_snapshot_id UUID NOT NULL
+    REFERENCES source_snapshot(source_snapshot_id) ON DELETE RESTRICT,
   location_level location_level_enum NOT NULL,
-  window_days SMALLINT NOT NULL CHECK (window_days IN (30, 90)),
+  period_type period_type_enum NOT NULL,
   period_start DATE NOT NULL,
   period_end DATE NOT NULL,
   median_price NUMERIC(12,2) NOT NULL,
+  average_price NUMERIC(12,2),
+  min_price NUMERIC(12,2),
+  max_price NUMERIC(12,2),
   p25_price NUMERIC(12,2),
   p75_price NUMERIC(12,2),
   observation_count INTEGER NOT NULL CHECK (observation_count >= 0),
@@ -241,32 +294,37 @@ CREATE TABLE IF NOT EXISTS price_summary (
   calculation_version TEXT NOT NULL,
   calculated_at TIMESTAMPTZ NOT NULL,
   UNIQUE (
-    pricecatcher_item_id,
+    seafood_item_id,
     location_id,
-    window_days,
+    period_type,
+    period_start,
     period_end,
     calculation_version
   )
 );
 
 -- =========================================================
--- 10. price_trend_point
+-- 11. price_trend_point  (keyed by seafood_item_id)
 -- =========================================================
 
 CREATE TABLE IF NOT EXISTS price_trend_point (
   price_trend_point_id UUID PRIMARY KEY,
-  pricecatcher_item_id UUID NOT NULL REFERENCES pricecatcher_item(pricecatcher_item_id),
-  location_id UUID NOT NULL REFERENCES location(location_id),
-  source_snapshot_id UUID NOT NULL REFERENCES source_snapshot(source_snapshot_id),
-  location_level location_level_enum NOT NULL,
+  seafood_item_id UUID NOT NULL
+    REFERENCES seafood_item(seafood_item_id) ON DELETE RESTRICT,
+  location_id UUID NOT NULL
+    REFERENCES location(location_id) ON DELETE RESTRICT,
+  source_snapshot_id UUID NOT NULL
+    REFERENCES source_snapshot(source_snapshot_id) ON DELETE RESTRICT,
   week_start DATE NOT NULL,
-  weekly_median NUMERIC(12,2) NOT NULL,
+  weekly_median_price NUMERIC(12,2) NOT NULL,
   observation_count INTEGER NOT NULL CHECK (observation_count >= 0),
   premise_count INTEGER NOT NULL CHECK (premise_count >= 0),
+  active_days SMALLINT NOT NULL CHECK (active_days >= 0),
   quality_status price_quality_enum NOT NULL,
   calculation_version TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (
-    pricecatcher_item_id,
+    seafood_item_id,
     location_id,
     week_start,
     calculation_version
@@ -274,12 +332,63 @@ CREATE TABLE IF NOT EXISTS price_trend_point (
 );
 
 -- =========================================================
--- 11. supply_landing_point
+-- 12. forecast_model_version
+-- =========================================================
+
+CREATE TABLE IF NOT EXISTS forecast_model_version (
+  forecast_model_version_id UUID PRIMARY KEY,
+  version_name TEXT NOT NULL UNIQUE,
+  algorithm TEXT NOT NULL,
+  training_window_start DATE,
+  training_window_end DATE,
+  validation_mae NUMERIC(12,4),
+  validation_rmse NUMERIC(12,4),
+  validation_mape NUMERIC(12,4),
+  interval_level NUMERIC(5,4),
+  configuration JSONB,
+  active BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (
+    interval_level IS NULL
+    OR (interval_level > 0 AND interval_level < 1)
+  )
+);
+
+-- =========================================================
+-- 13. price_forecast  (separate from observed prices)
+-- =========================================================
+
+CREATE TABLE IF NOT EXISTS price_forecast (
+  price_forecast_id UUID PRIMARY KEY,
+  seafood_item_id UUID NOT NULL
+    REFERENCES seafood_item(seafood_item_id) ON DELETE RESTRICT,
+  location_id UUID NOT NULL
+    REFERENCES location(location_id) ON DELETE RESTRICT,
+  forecast_model_version_id UUID NOT NULL
+    REFERENCES forecast_model_version(forecast_model_version_id) ON DELETE RESTRICT,
+  forecast_week_start DATE NOT NULL,
+  expected_price NUMERIC(12,2) NOT NULL,
+  lower_bound NUMERIC(12,2) NOT NULL,
+  upper_bound NUMERIC(12,2) NOT NULL,
+  outlook TEXT,
+  generated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (
+    seafood_item_id,
+    location_id,
+    forecast_model_version_id,
+    forecast_week_start
+  ),
+  CHECK (lower_bound <= expected_price AND expected_price <= upper_bound)
+);
+
+-- =========================================================
+-- 14. supply_landing_point  (independent of seafood_item)
 -- =========================================================
 
 CREATE TABLE IF NOT EXISTS supply_landing_point (
   supply_landing_point_id UUID PRIMARY KEY,
-  source_snapshot_id UUID NOT NULL REFERENCES source_snapshot(source_snapshot_id),
+  source_snapshot_id UUID NOT NULL
+    REFERENCES source_snapshot(source_snapshot_id) ON DELETE RESTRICT,
   period_month DATE NOT NULL,
   scope_level TEXT NOT NULL
     CHECK (scope_level IN ('NATIONAL', 'COAST', 'COAST_STATE')),
@@ -298,7 +407,7 @@ CREATE TABLE IF NOT EXISTS supply_landing_point (
 );
 
 -- =========================================================
--- 12. cooking_method
+-- 15. cooking_method
 -- =========================================================
 
 CREATE TABLE IF NOT EXISTS cooking_method (
@@ -310,14 +419,17 @@ CREATE TABLE IF NOT EXISTS cooking_method (
 );
 
 -- =========================================================
--- 13. cooking_suitability
+-- 16. cooking_suitability
 -- =========================================================
 
 CREATE TABLE IF NOT EXISTS cooking_suitability (
   cooking_suitability_id UUID PRIMARY KEY,
-  seafood_item_id UUID NOT NULL REFERENCES seafood_item(seafood_item_id),
-  cooking_method_id UUID NOT NULL REFERENCES cooking_method(cooking_method_id),
-  source_snapshot_id UUID REFERENCES source_snapshot(source_snapshot_id),
+  seafood_item_id UUID NOT NULL
+    REFERENCES seafood_item(seafood_item_id) ON DELETE RESTRICT,
+  cooking_method_id UUID NOT NULL
+    REFERENCES cooking_method(cooking_method_id) ON DELETE RESTRICT,
+  source_snapshot_id UUID
+    REFERENCES source_snapshot(source_snapshot_id) ON DELETE RESTRICT,
   suitability_score SMALLINT CHECK (suitability_score BETWEEN 1 AND 5),
   reason_en TEXT NOT NULL,
   reason_ms TEXT,
@@ -326,7 +438,7 @@ CREATE TABLE IF NOT EXISTS cooking_suitability (
 );
 
 -- =========================================================
--- 14. cv_model_version
+-- 17. cv_model_version
 -- =========================================================
 
 CREATE TABLE IF NOT EXISTS cv_model_version (
@@ -335,6 +447,7 @@ CREATE TABLE IF NOT EXISTS cv_model_version (
   input_contract JSONB NOT NULL,
   metrics JSONB NOT NULL,
   confidence_threshold NUMERIC(5,4),
+  active BOOLEAN NOT NULL DEFAULT FALSE,
   CHECK (
     confidence_threshold IS NULL
     OR (confidence_threshold >= 0 AND confidence_threshold <= 1)
@@ -342,12 +455,28 @@ CREATE TABLE IF NOT EXISTS cv_model_version (
 );
 
 -- =========================================================
--- 15. recipe
+-- 18. cv_class_mapping  (model label/index → seafood_item_id)
+-- =========================================================
+
+CREATE TABLE IF NOT EXISTS cv_class_mapping (
+  cv_class_mapping_id UUID PRIMARY KEY,
+  cv_model_version_id UUID NOT NULL
+    REFERENCES cv_model_version(cv_model_version_id) ON DELETE RESTRICT,
+  seafood_item_id UUID NOT NULL
+    REFERENCES seafood_item(seafood_item_id) ON DELETE RESTRICT,
+  model_class_label TEXT NOT NULL,
+  model_class_index INTEGER NOT NULL,
+  UNIQUE (cv_model_version_id, model_class_label)
+);
+
+-- =========================================================
+-- 19. recipe
 -- =========================================================
 
 CREATE TABLE IF NOT EXISTS recipe (
   recipe_id UUID PRIMARY KEY,
-  source_snapshot_id UUID NOT NULL REFERENCES source_snapshot(source_snapshot_id),
+  source_snapshot_id UUID NOT NULL
+    REFERENCES source_snapshot(source_snapshot_id) ON DELETE RESTRICT,
   external_recipe_id TEXT NOT NULL,
   title TEXT NOT NULL,
   description TEXT,
@@ -368,13 +497,15 @@ CREATE TABLE IF NOT EXISTS recipe (
 );
 
 -- =========================================================
--- 16. recipe_seafood_mapping
+-- 20. recipe_seafood_mapping
 -- =========================================================
 
 CREATE TABLE IF NOT EXISTS recipe_seafood_mapping (
   recipe_seafood_mapping_id UUID PRIMARY KEY,
-  recipe_id UUID NOT NULL REFERENCES recipe(recipe_id),
-  seafood_item_id UUID NOT NULL REFERENCES seafood_item(seafood_item_id),
+  recipe_id UUID NOT NULL
+    REFERENCES recipe(recipe_id) ON DELETE RESTRICT,
+  seafood_item_id UUID NOT NULL
+    REFERENCES seafood_item(seafood_item_id) ON DELETE RESTRICT,
   mapping_type recipe_mapping_type_enum NOT NULL,
   notes TEXT,
   created_at TIMESTAMPTZ NOT NULL,
@@ -382,13 +513,15 @@ CREATE TABLE IF NOT EXISTS recipe_seafood_mapping (
 );
 
 -- =========================================================
--- 17. recipe_cooking_method
+-- 21. recipe_cooking_method
 -- =========================================================
 
 CREATE TABLE IF NOT EXISTS recipe_cooking_method (
   recipe_cooking_method_id UUID PRIMARY KEY,
-  recipe_id UUID NOT NULL REFERENCES recipe(recipe_id),
-  cooking_method_id UUID NOT NULL REFERENCES cooking_method(cooking_method_id),
+  recipe_id UUID NOT NULL
+    REFERENCES recipe(recipe_id) ON DELETE RESTRICT,
+  cooking_method_id UUID NOT NULL
+    REFERENCES cooking_method(cooking_method_id) ON DELETE RESTRICT,
   source_method_text TEXT,
   notes TEXT,
   UNIQUE (recipe_id, cooking_method_id)

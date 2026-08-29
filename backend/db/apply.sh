@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Apply the SukaSeafood I1 schema and reference seed to a PostgreSQL database.
+# Apply the SukaSeafood V3 schema and reference seed to a PostgreSQL database.
 #
 #   ./apply.sh                                   # uses $DATABASE_URL or the local default
-#   DATABASE_URL=postgresql://... ./apply.sh     # explicit target (e.g. Supabase)
+#   DATABASE_URL=postgresql://... ./apply.sh     # explicit target (e.g. Cloud SQL)
 #   ./apply.sh --schema-only                     # structure, no seed data
 #
 # Every file is idempotent, so re-running is safe and is the normal way to pick
@@ -25,8 +25,9 @@ run() {
 
 echo "Target: $(printf '%s' "$DB" | sed -E 's#://[^@]*@#://***@#')"
 
-run "$DIR/schema/i1_initial_schema.sql"
-run "$DIR/schema/i1_functions_indexes.sql"
+run "$DIR/schema/v3_initial_schema.sql"
+run "$DIR/schema/v3_migrate_from_i1.sql"
+run "$DIR/schema/v3_functions_indexes.sql"
 run "$DIR/schema/i1_app_user.sql"
 
 if [ "$SCHEMA_ONLY" -eq 0 ]; then

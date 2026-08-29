@@ -5,7 +5,7 @@
 -- UI both read from these two tables.
 --
 -- A data_source is the publisher. A source_snapshot is one dated extract from
--- that publisher: it is what wwf_assessment, pricecatcher_item, price_summary,
+-- that publisher: it is what wwf_assessment, pricecatcher_item, price_period_summary,
 -- supply_landing_point and recipe all hang off, so re-importing a newer extract
 -- never silently overwrites the evidence behind what a user already saw.
 --

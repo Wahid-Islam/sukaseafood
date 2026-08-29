@@ -4,8 +4,13 @@
 # Database: sukaseafood-654b7-database
 # Trial: ~3 months no-cost (see Firebase Console banner)
 #
-# App accounts + seafood domain data live in **PostgreSQL only**
-# (table `app_user` + I1 schema under backend/db/). Firestore is not used.
+# Schema contract: **Database Schema V3**
+#   - SQL source of truth: backend/db/schema/v3_*.sql
+#   - GraphQL mirror:     dataconnect/schema/schema.gql
+#   - seafood_item_id is the only canonical seafood identity
+#
+# App accounts + seafood domain data live in **PostgreSQL only**.
+# Firestore is not used for domain data.
 #
 # Apply GitHub SQL to Cloud SQL or local Docker:
 #
@@ -14,5 +19,8 @@
 #     bash backend/db/apply.sh
 #
 # Then point FastAPI at that DATABASE_URL and run the API.
+#
+# Keep dataconnect.yaml schemaValidation unset or COMPATIBLE so Firebase does
+# not overwrite the reviewed SQL DDL.
 #
 # Console: https://console.firebase.google.com/project/sukaseafood-654b7/dataconnect
