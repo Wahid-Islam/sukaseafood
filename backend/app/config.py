@@ -57,7 +57,18 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = 60 * 24 * 14  # 14 days
 
     # --- CV ----------------------------------------------------------------
-    identify_model_version: str = "mock-cv-v0.1"
+    # Directory holding the CV owner's handoff package: model.onnx,
+    # class_map.json, preprocessing.json, model_card.json. Relative paths are
+    # resolved against backend/, so the server behaves the same wherever it is
+    # launched from.
+    cv_package_dir: str = "cv_package"
+    # Overrides the threshold recorded in the package. Left None, the validated
+    # value from model_card.json is used; if that is null too, every response is
+    # LOW_CONFIDENCE, which is the honest state for a model with no validated
+    # cut-off. The threshold lives here rather than in the model so it can be
+    # tuned without a redeploy.
+    cv_confidence_threshold: float | None = None
+    cv_intra_op_threads: int = 2
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

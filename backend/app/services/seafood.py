@@ -17,6 +17,7 @@ are editorial decisions that must be visible in code review:
 from __future__ import annotations
 
 import random
+import uuid
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -143,10 +144,36 @@ async def list_seafood(session: AsyncSession) -> list[SeafoodItem]:
 
 
 async def get_seafood_by_id(session: AsyncSession, fish_id: str) -> SeafoodItem | None:
-    """Resolve the public identifier (`code`) to a canonical record."""
+    """Resolve a seafood identifier to a canonical record.
+
+    Accepts either form of the identifier:
+
+      * `code`            — 'SF001', the readable public identifier used in
+                            URLs and by anyone typing one by hand
+      * `seafood_item_id` — the canonical UUID, which is what /identify
+                            returns and what every table joins on
+
+    Both are needed. The scanner hands the client a UUID, and the client then
+    asks for that fish's profile, price and cooking; if this only understood
+    codes, the whole scan → confirm → decide journey would break at the first
+    step after confirmation.
+    """
+    identifier = fish_id.strip()
+
+    try:
+        as_uuid = uuid.UUID(identifier)
+    except (ValueError, AttributeError):
+        as_uuid = None
+
+    predicate = (
+        SeafoodItem.seafood_item_id == as_uuid
+        if as_uuid is not None
+        else func.upper(SeafoodItem.code) == identifier.upper()
+    )
+
     stmt = (
         select(SeafoodItem)
-        .where(func.upper(SeafoodItem.code) == fish_id.strip().upper())
+        .where(predicate)
         .options(
             selectinload(SeafoodItem.aliases),
             _assessment_loader(),

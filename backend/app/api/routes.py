@@ -19,6 +19,7 @@ from app.schemas import (
     SourceMetaOut,
 )
 from app.models import SeafoodItem
+from app.services import cv as cv_service
 from app.services import seafood as seafood_service
 
 router = APIRouter()
@@ -125,26 +126,83 @@ async def cooking_recommendations(
     )
 
 
+ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+
+
+def _error(code: str, message: str) -> dict:
+    """The standard error envelope."""
+    return {"error": {"code": code, "message": message, "details": {}}}
+
+
 @router.post("/identify", response_model=IdentifyResponse)
 async def identify_seafood(
-    hint: str | None = Query(
-        default=None,
-        description="Optional demo hint to bias mock CV result",
-    ),
-    image: UploadFile | None = File(default=None),
+    file: UploadFile = File(..., description="One whole fish. JPEG/PNG/WebP, <=10 MB."),
     db: AsyncSession = Depends(get_db),
 ) -> IdentifyResponse:
-    """
-    Computer-vision identify endpoint.
+    """Identify a fish from one photograph.
 
-    Iteration 1 ships a mock adapter. Accepts an optional image upload so the
-    mobile camera flow can integrate early. Fish-Vista model swaps in later.
+    Returns up to three ranked candidates, each already resolved to a canonical
+    seafood_item_id. The result is a SUGGESTION: the client shows all of them
+    and the user confirms one, or chooses "None of these". Sustainability,
+    price and cooking are only applicable to a confirmed species.
+
+    The uploaded image is never stored. It exists as one local variable for the
+    life of the request and is dropped when it returns.
     """
-    _ = image  # Reserved for real CV adapter.
+    # 415 and 413 are decided before the model is touched, so a junk upload
+    # cannot spend inference CPU.
+    if file.content_type not in ALLOWED_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=415,
+            detail=_error("UNSUPPORTED_MEDIA_TYPE",
+                          "Image must be JPEG, PNG or WebP."),
+        )
+
+    image_bytes = await file.read()
+
+    if len(image_bytes) > MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=_error("IMAGE_TOO_LARGE", "Image exceeds the 10 MB limit."),
+        )
+
     try:
-        return await seafood_service.mock_identify(db, hint=hint)
-    except ValueError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        result = cv_service.get_adapter().predict(image_bytes)
+    except cv_service.CvUnavailable as exc:
+        raise HTTPException(503, detail=_error("MODEL_UNAVAILABLE", str(exc))) from exc
+    except Exception as exc:  # the adapter's own typed errors
+        name = type(exc).__name__
+        if name == "ImageTooLargeError":
+            raise HTTPException(413, detail=_error("IMAGE_TOO_LARGE", str(exc))) from exc
+        if name == "InvalidImageError":
+            raise HTTPException(422, detail=_error("INVALID_IMAGE_CONTENT", str(exc))) from exc
+        if name == "ModelUnavailableError":
+            raise HTTPException(503, detail=_error("MODEL_UNAVAILABLE", str(exc))) from exc
+        raise
+    finally:
+        # No durable storage of user photographs, and none are reused as
+        # training data.
+        del image_bytes
+
+    # A class the active model has no mapping for is a configuration error, not
+    # something to guess past. It belongs in the same 503 bucket as a missing
+    # model: the scanner genuinely cannot serve an answer, and naming the wrong
+    # fish would be worse than saying so.
+    try:
+        candidates = await cv_service.resolve_candidates(
+            db, result["model_version"], result["predictions"]
+        )
+    except cv_service.CvUnavailable as exc:
+        raise HTTPException(503, detail=_error("MODEL_UNAVAILABLE", str(exc))) from exc
+
+    return IdentifyResponse(
+        status=result["status"],       # CANDIDATES or LOW_CONFIDENCE, both HTTP 200
+        model_version=result["model_version"],
+        confirmation_required=True,    # always; top-1 is never auto-finalised
+        image_persisted=False,
+        candidates=candidates,
+    )
 
 
 @router.get("/sources", response_model=list[SourceMetaOut])

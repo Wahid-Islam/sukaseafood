@@ -1,0 +1,39 @@
+# cv/.gitignore
+#
+# The rule here: commit what the backend needs to serve and what makes a result
+# reproducible; ignore what can be regenerated or re-downloaded.
+#
+# handoff/ is COMMITTED on purpose. It was ignored while it was an unbuilt
+# output; it is now the trained artifact the API loads (model.onnx ~6 MB, plus
+# class_map.json and model_card.json). A clone without it cannot scan, and the
+# class map has to stay byte-identical to the .onnx it was exported with — so
+# they travel together or not at all.
+
+__pycache__/
+*.pyc
+.venv/
+
+# Training checkpoints, ~6 MB each. The served artifact is the ONNX export in
+# handoff/; these only matter for resuming or re-exporting.
+#   regenerate:  python scripts/train.py --stage b ...
+artifacts/*.pt
+
+# A scratch package built by make_dev_package.py with an UNTRAINED classifier.
+# Predictions are noise; it exists only to exercise wiring.
+dev_package/
+
+# The image corpus — hundreds of MB to ~2 GB. Lives outside the repo;
+# data/manifest.csv records exactly which image was used and under which
+# licence, which is what actually makes the training run reproducible.
+data/images/
+incoming*/
+
+# ImageNet initialisation weights, ~52 MB.
+#   regenerate:  python scripts/fetch_weights.py
+weights/
+
+# Stray ONNX files anywhere except the handoff package. Without the negation an
+# accidental export in the working tree gets committed and quietly competes with
+# the real artifact.
+*.onnx
+!handoff/*.onnx

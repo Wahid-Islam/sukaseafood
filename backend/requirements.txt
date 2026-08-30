@@ -16,6 +16,28 @@ psycopg[binary]>=3.2.0   # sync driver used by Alembic
 greenlet>=3.0.0          # required by SQLAlchemy's async bridge
 alembic>=1.14.0
 
+# --- CV inference (08 — CV Integration Contract) -----------------------------
+# Training dependencies live in cv/requirements-train.txt; the API only needs
+# to run the exported ONNX graph. These three are what stands between a working
+# scanner and a permanent 503 MODEL_UNAVAILABLE.
+#
+# onnxruntime: 1.16 is the floor, not 1.17, because onnxruntime's newer macOS
+# wheels are tagged macosx_13_0 and are unavailable on macOS 12 and earlier —
+# where 1.16.3 is the last installable release. 1.16 handles the opset-17 graph
+# that export_onnx.py produces; this was verified against the real artifact,
+# not assumed.
+onnxruntime>=1.16
+#
+# numpy: onnxruntime below 1.19 is compiled against NumPy 1.x and SEGFAULTS on
+# import under NumPy 2 ("_ARRAY_API not found") — a hard crash, not an error
+# any try/except can catch. Since older macOS is pinned to onnxruntime 1.16.3,
+# numpy must stay on 1.x there. Python 3.13 has no NumPy 1.x wheels, but it
+# also only has onnxruntime 1.20+, which is NumPy 2-safe — so the two markers
+# never overlap and neither combination is reachable.
+numpy>=1.26,<2; python_version < "3.13"
+numpy>=2.1; python_version >= "3.13"
+pillow>=10.0
+
 # --- Firebase ----------------------------------------------------------------
 # firebase-admin is NOT here on purpose. It is optional at runtime: without it,
 # app/firebase.py still builds public Storage download URLs, and only signed

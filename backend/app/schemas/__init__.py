@@ -1,6 +1,8 @@
 """Pydantic request/response schemas."""
 
+import uuid
 from datetime import date
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -116,22 +118,35 @@ class SearchResponse(BaseModel):
 
 
 class IdentifyCandidate(BaseModel):
-    """One CV prediction candidate."""
+    """One ranked candidate, already resolved to a canonical seafood_item."""
 
-    fish_id: str
-    primary_common_name: str
+    rank: int = Field(ge=1)
+    # The canonical key. Every downstream call — sustainability, price,
+    # cooking, favourites — takes this id, not a name or a model class code.
+    seafood_item_id: uuid.UUID
+    code: str
+    canonical_name_ms: str
+    display_name_en: str
     scientific_name: str
     confidence: float = Field(ge=0.0, le=1.0)
 
 
 class IdentifyResponse(BaseModel):
-    """Mock / real CV identify response."""
+    """POST /identify response.
 
+    status is a BUSINESS state carried on HTTP 200:
+      CANDIDATES      top-1 cleared the model's validated threshold
+      LOW_CONFIDENCE  it did not, or no threshold has been validated yet
+
+    Both return candidates. Neither settles an identity: the user confirms one
+    or picks "None of these", and only then is the fish treated as identified.
+    """
+
+    status: Literal["CANDIDATES", "LOW_CONFIDENCE"]
     model_version: str
-    top_prediction: IdentifyCandidate
-    alternatives: list[IdentifyCandidate]
-    requires_user_confirmation: bool = True
-    is_mock: bool = True
+    confirmation_required: bool = True
+    image_persisted: bool = False
+    candidates: list[IdentifyCandidate]
 
 
 class CookingRecommendationOut(BaseModel):

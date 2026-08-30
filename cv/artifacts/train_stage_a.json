@@ -1,0 +1,8 @@
+{
+  "stage": "a",
+  "val_accuracy": 0.801980197429657,
+  "train_n": 932,
+  "val_n": 202,
+  "backbone": "mobilenetv3_small_100",
+  "checkpoint": "artifacts/model_stage_a.pt"
+}

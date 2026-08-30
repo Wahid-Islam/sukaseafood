@@ -1,4 +1,69 @@
-"""API contract tests against a real PostgreSQL database."""
+"""API contract tests against a real PostgreSQL database.
+
+The scanner tests here deliberately use real held-out photographs rather than
+synthetic noise. A test that feeds random pixels proves the plumbing works and
+nothing else; it would keep passing after a training run that destroyed the
+model's accuracy. These assert that a photograph of a kembung comes back as
+kembung, carrying the same seafood_item_id that search returns for kembung —
+which is the whole point of the CV feature.
+
+Where the corpus is not present (CI without the image set), those tests skip
+with a message rather than failing, because the images are ~2 GB and are not
+checked into the repository.
+"""
+
+import io
+import os
+import pathlib
+import uuid
+
+import pytest
+
+# The corpus is optional: cloned repos do not carry 2 GB of photographs.
+# Note the explicit empty check — Path("") is Path("."), and "." is a directory,
+# so an is_dir() test alone would silently enable these tests with the wrong
+# root and fail with "0 images found" instead of skipping.
+_corpus_env = os.environ.get("CV_TEST_IMAGES", "").strip()
+CORPUS = pathlib.Path(_corpus_env).expanduser() if _corpus_env else None
+MANIFEST = pathlib.Path(__file__).resolve().parents[2] / "cv" / "data" / "manifest.csv"
+
+needs_corpus = pytest.mark.skipif(
+    not (CORPUS and CORPUS.is_dir() and MANIFEST.exists()),
+    reason=(
+        "Set CV_TEST_IMAGES to the image corpus root (the folder holding "
+        "KEMBUNG/, TENGGIRI/, …) to run scanner accuracy tests."
+    ),
+)
+
+
+def _held_out(limit_per_class: int = 2) -> list[tuple[str, pathlib.Path]]:
+    """Test-split images only — never anything the model trained or tuned on."""
+    import collections
+    import csv
+
+    picked: list[tuple[str, pathlib.Path]] = []
+    seen: collections.Counter = collections.Counter()
+    with MANIFEST.open(newline="", encoding="utf-8") as fh:
+        for row in csv.DictReader(fh):
+            if row["split"] != "test_clean":
+                continue
+            if seen[row["class_code"]] >= limit_per_class:
+                continue
+            path = CORPUS / row["local_path"]
+            if not path.exists():
+                continue
+            seen[row["class_code"]] += 1
+            picked.append((row["class_code"], path))
+    return picked
+
+
+def _jpeg(width: int = 224, height: int = 224, colour=(120, 130, 140)) -> bytes:
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", (width, height), colour).save(buf, format="JPEG")
+    return buf.getvalue()
+
 
 
 def test_health(client):
@@ -14,15 +79,25 @@ def test_database_health(client):
     body = res.json()
     assert body["database"] == "postgresql"
     assert body["schema_applied"] is True
-    assert body["seafood_count"] == 5
+    assert body["seafood_count"] == 12
 
 
 def test_list_seafood(client):
+    """Twelve species in the catalogue, nine of which the scanner can see.
+
+    The catalogue is deliberately wider than the class map. SF003/4/5 have no
+    usable training imagery, and dropping them from the catalogue to match the
+    model would remove working search, WWF and cooking data that the app
+    already ships. They stay, flagged supports_cv = FALSE.
+    """
     res = client.get("/api/v1/seafood")
     assert res.status_code == 200
     items = res.json()
-    assert len(items) == 5
-    assert {i["fish_id"] for i in items} == {"SF001", "SF002", "SF003", "SF004", "SF005"}
+    assert len(items) == 12
+    assert {i["fish_id"] for i in items} == {
+        "SF001", "SF002", "SF003", "SF004", "SF005", "SF006",
+        "SF007", "SF008", "SF009", "SF010", "SF011", "SF012",
+    }
 
 
 def test_search_by_malay_alias(client):
@@ -101,11 +176,235 @@ def test_cooking_recommendations_accept_aliases(client):
     assert any(r["fish_id"] == "SF004" for r in fried), "tilapia is the top fry pick"
 
 
-def test_identify_returns_a_cv_supported_species(client):
-    body = client.post("/api/v1/identify").json()
-    assert body["is_mock"] is True
-    assert body["requires_user_confirmation"] is True
-    assert body["top_prediction"]["fish_id"].startswith("SF")
+# --- scanner contract -------------------------------------------------------
+
+
+def test_identify_rejects_a_non_image(client):
+    """415 is decided before the model is touched, so junk cannot spend CPU."""
+    res = client.post(
+        "/api/v1/identify",
+        files={"file": ("notes.txt", b"this is not a fish", "text/plain")},
+    )
+    assert res.status_code == 415
+    assert res.json()["detail"]["error"]["code"] == "UNSUPPORTED_MEDIA_TYPE"
+
+
+def test_identify_rejects_an_oversized_upload(client):
+    """413 before decoding: a 12 MB payload must not reach the JPEG decoder."""
+    res = client.post(
+        "/api/v1/identify",
+        files={"file": ("huge.jpg", b"\xff\xd8\xff" + b"\x00" * (12 << 20), "image/jpeg")},
+    )
+    assert res.status_code == 413
+    assert res.json()["detail"]["error"]["code"] == "IMAGE_TOO_LARGE"
+
+
+def test_identify_rejects_a_corrupt_image(client):
+    """A file that claims to be a JPEG but will not decode is 422, not 500."""
+    res = client.post(
+        "/api/v1/identify",
+        files={"file": ("broken.jpg", b"\xff\xd8\xff\xe0" + b"garbage" * 50, "image/jpeg")},
+    )
+    assert res.status_code == 422
+    assert res.json()["detail"]["error"]["code"] == "INVALID_IMAGE_CONTENT"
+
+
+def test_identify_requires_a_file(client):
+    assert client.post("/api/v1/identify").status_code == 422
+
+
+def test_identify_shape_and_canonical_ids(client):
+    """Every candidate must carry a real seafood_item_id, ranked, never mocked.
+
+    Uses a flat grey frame: the prediction is meaningless, which is the point —
+    this test is about the response contract, not accuracy.
+    """
+    res = client.post(
+        "/api/v1/identify", files={"file": ("f.jpg", _jpeg(), "image/jpeg")}
+    )
+    assert res.status_code == 200
+    body = res.json()
+
+    assert body["status"] in {"CANDIDATES", "LOW_CONFIDENCE"}
+    # Top-1 is never auto-finalised. A wrong species presented as settled fact
+    # is the failure mode this whole feature has to avoid.
+    assert body["confirmation_required"] is True
+    # User photographs are not stored and are not reused as training data.
+    assert body["image_persisted"] is False
+    assert body["model_version"] and "UNTRAINED" not in body["model_version"].upper()
+
+    assert 1 <= len(body["candidates"]) <= 3
+    assert [c["rank"] for c in body["candidates"]] == list(
+        range(1, len(body["candidates"]) + 1)
+    )
+    confidences = [c["confidence"] for c in body["candidates"]]
+    assert confidences == sorted(confidences, reverse=True), "must be ranked"
+
+    for c in body["candidates"]:
+        uuid.UUID(c["seafood_item_id"])          # a real UUID, not a slug
+        assert c["code"].startswith("SF")
+        assert c["display_name_en"] and c["scientific_name"]
+        assert 0.0 <= c["confidence"] <= 1.0
+
+
+def test_identify_never_returns_an_unscannable_species(client):
+    """SF003/4/5 have no training images. The scanner must never name them.
+
+    If one appeared here it would mean cv_class_mapping and the catalogue had
+    drifted apart — the silent failure the seed guards exist to prevent.
+    """
+    seen = set()
+    for colour in ((30, 30, 30), (200, 200, 200), (90, 140, 190), (170, 120, 80)):
+        body = client.post(
+            "/api/v1/identify",
+            files={"file": ("f.jpg", _jpeg(colour=colour), "image/jpeg")},
+        ).json()
+        seen.update(c["code"] for c in body["candidates"])
+    assert seen and not (seen & {"SF003", "SF004", "SF005"})
+
+
+def test_low_confidence_is_a_200_business_state_not_an_error(client):
+    """Below threshold the app shows "not sure" — it does not show a failure.
+
+    A 4xx here would push the client into an error path and lose the candidate
+    list, which is exactly what a hesitant user needs to see.
+    """
+    res = client.post(
+        "/api/v1/identify", files={"file": ("f.jpg", _jpeg(colour=(255, 0, 255)), "image/jpeg")}
+    )
+    assert res.status_code == 200
+    assert res.json()["candidates"], "candidates are returned even when unsure"
+
+
+@needs_corpus
+def test_scanned_id_is_the_same_entity_search_returns(client):
+    """The join the whole feature rests on.
+
+    A photograph scanned and a name typed must arrive at one row. If these two
+    ids ever diverge, price, WWF rating and cooking would be read off a
+    different fish than the one on screen.
+    """
+    samples = _held_out(limit_per_class=1)
+    assert samples, "manifest has test_clean rows but no files were found"
+
+    code, path = samples[0]
+    body = client.post(
+        "/api/v1/identify",
+        files={"file": (path.name, path.read_bytes(), "image/jpeg")},
+    ).json()
+    scanned_id = body["candidates"][0]["seafood_item_id"]
+    scanned_code = body["candidates"][0]["code"]
+
+    # Reached by the id the scanner returned...
+    by_uuid = client.get(f"/api/v1/seafood/{scanned_id}")
+    assert by_uuid.status_code == 200, "the scanner's own id must resolve"
+
+    # ...and by the code a search would produce. Same row.
+    by_code = client.get(f"/api/v1/seafood/{scanned_code}")
+    assert by_code.status_code == 200
+    assert by_uuid.json() == by_code.json()
+
+    # And that row carries the joined context the app renders.
+    profile = by_uuid.json()
+    assert profile["aliases"]
+    assert profile["cooking"]
+    assert profile["sustainability"]["classification"]
+
+
+@needs_corpus
+def test_scanner_is_better_than_chance_on_held_out_images(client):
+    """A regression floor, not a benchmark.
+
+    Set well below the measured 78% top-1 / 94% top-3 so ordinary run-to-run
+    variation does not fail the build, but high enough that a broken export, a
+    shuffled class map or a wrong preprocessing constant is caught — each of
+    those collapses accuracy to roughly 1/9.
+    """
+    samples = _held_out(limit_per_class=2)
+    assert len(samples) >= 9, f"only {len(samples)} held-out images available"
+
+    top1 = top3 = 0
+    for code, path in samples:
+        body = client.post(
+            "/api/v1/identify",
+            files={"file": (path.name, path.read_bytes(), "image/jpeg")},
+        ).json()
+        codes = [c["code"] for c in body["candidates"]]
+        top1 += codes[0] == code
+        top3 += code in codes
+
+    n = len(samples)
+    assert top1 / n >= 0.50, f"top-1 {top1}/{n} — far below the trained 0.78"
+    assert top3 / n >= 0.75, f"top-3 {top3}/{n} — far below the trained 0.94"
+
+
+def test_every_scannable_species_leads_somewhere(client):
+    """A scan must not open an empty page.
+
+    Resolving to a canonical id is only worth something if that id reaches the
+    rest of the catalogue. This walks the reverse of the scanner's own join:
+    for each class the model can emit, fetch the profile by the very id
+    /identify returns and assert the sections the app renders are populated.
+    """
+    body = client.post(
+        "/api/v1/identify", files={"file": ("f.jpg", _jpeg(), "image/jpeg")}
+    ).json()
+    assert body["candidates"]
+
+    # Every code the model can emit, discovered from the catalogue rather than
+    # hard-coded, so adding a class to the model cannot leave this test stale.
+    scannable = [
+        i["fish_id"] for i in client.get("/api/v1/seafood").json()
+        if i["fish_id"] not in {"SF003", "SF004", "SF005"}
+    ]
+    assert len(scannable) == 9
+
+    for code in scannable:
+        profile = client.get(f"/api/v1/seafood/{code}")
+        assert profile.status_code == 200, code
+        p = profile.json()
+        assert p["aliases"], f"{code} has no aliases — search cannot find it"
+        assert p["cooking"], f"{code} scans to an empty cooking section"
+        # UNDETERMINED is a valid, deliberate answer here; absent is not.
+        assert p["sustainability"]["classification"], code
+        assert client.get(f"/api/v1/seafood/{code}/price").status_code == 200, code
+
+
+def test_cooking_search_finds_the_newly_scannable_species(client):
+    """The join runs both ways: method -> species, not only species -> method."""
+    curry = client.get("/api/v1/cooking/curry").json()["recommendations"]
+    assert any(r["fish_id"] == "SF012" for r in curry), "tenggiri is the curry fish"
+
+    fried = client.get("/api/v1/cooking/fry").json()["recommendations"]
+    assert any(r["fish_id"] == "SF011" for r in fried), "selar kuning fries whole"
+
+
+def test_unrated_new_species_is_undetermined_not_guessed(client):
+    """The seven CV-expansion species have no WWF assessment, by design.
+
+    Giving them a default rating to fill the gap would read to a shopper as
+    approval of a species nobody has assessed. Absent guidance must stay
+    visibly absent.
+    """
+    for code in ("SF006", "SF007", "SF008", "SF009", "SF010", "SF011", "SF012"):
+        s = client.get(f"/api/v1/seafood/{code}").json()["sustainability"]
+        assert s["classification"] == "UNDETERMINED", code
+        assert s["verified"] is False, code
+
+
+def test_class_map_matches_the_registered_model(client):
+    """The catalogue's scannable set and the model's class map must agree.
+
+    Enforced in SQL at seed time too; asserted here because this is the
+    mismatch that produces confidently wrong answers with no error anywhere.
+    """
+    items = client.get("/api/v1/seafood").json()
+    assert len(items) == 12
+
+    body = client.post(
+        "/api/v1/identify", files={"file": ("f.jpg", _jpeg(), "image/jpeg")}
+    ).json()
+    assert body["model_version"] == "cv-i1-2026-08-30"
 
 
 def test_sources_listed(client):

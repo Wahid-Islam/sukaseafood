@@ -1,0 +1,59 @@
+{
+  "model_version": "cv-i1-2026-08-30",
+  "classes": [
+    {
+      "class_index": 0,
+      "class_code": "SF001",
+      "label": "Kembung / Pelaling",
+      "scientific_name": "Rastrelliger kanagurta"
+    },
+    {
+      "class_index": 1,
+      "class_code": "SF002",
+      "label": "Bawal Hitam",
+      "scientific_name": "Parastromateus niger"
+    },
+    {
+      "class_index": 2,
+      "class_code": "SF006",
+      "label": "Bawal Putih",
+      "scientific_name": "Pampus argenteus"
+    },
+    {
+      "class_index": 3,
+      "class_code": "SF007",
+      "label": "Cencaru",
+      "scientific_name": "Megalaspis cordyla"
+    },
+    {
+      "class_index": 4,
+      "class_code": "SF008",
+      "label": "Jenahak",
+      "scientific_name": "Lutjanus johnii"
+    },
+    {
+      "class_index": 5,
+      "class_code": "SF009",
+      "label": "Kerisi",
+      "scientific_name": "Nemipterus japonicus"
+    },
+    {
+      "class_index": 6,
+      "class_code": "SF010",
+      "label": "Pelata",
+      "scientific_name": "Alepes melanoptera"
+    },
+    {
+      "class_index": 7,
+      "class_code": "SF011",
+      "label": "Selar Kuning",
+      "scientific_name": "Selaroides leptolepis"
+    },
+    {
+      "class_index": 8,
+      "class_code": "SF012",
+      "label": "Tenggiri",
+      "scientific_name": "Scomberomorus commerson"
+    }
+  ]
+}
