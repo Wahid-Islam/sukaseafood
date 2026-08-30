@@ -68,3 +68,35 @@ docs/artefacts/*.pdf
 
 # Local UI PDF raster previews
 _ui_preview/
+
+# --- CV scanner ---------------------------------------------------------------
+# What is committed and what is not, and why:
+#
+#   cv/handoff/          COMMITTED. The frozen model artifact (~6 MB) plus its
+#                        class map and model card. This is the source of truth
+#                        the backend serves; a clone without it cannot scan, and
+#                        the class map must stay byte-identical to the .onnx it
+#                        was exported with.
+#   cv/data/manifest.csv COMMITTED. The provenance record — which image, which
+#                        licence, which split. Small, and it is what makes the
+#                        accuracy figure reproducible.
+#
+# Everything below is regenerable, large, or both.
+
+# Training checkpoints — 6 MB each, and the ONNX export in handoff/ is what
+# actually gets served. Re-create with scripts/train.py.
+cv/artifacts/*.pt
+
+# ImageNet initialisation weights (~52 MB). Re-fetch with:
+#   python scripts/fetch_weights.py
+cv/weights/
+
+# The image corpus itself — hundreds of MB to ~2 GB. Kept outside the repo;
+# rebuild the manifest with scripts/import_candidates.py.
+cv/data/images/
+cv/incoming/
+
+# A deploy-time copy of cv/handoff/. Committing it would put the same 6 MB
+# artifact in the repository twice and let the two drift apart. run.sh installs
+# it automatically when it is missing.
+backend/cv_package/

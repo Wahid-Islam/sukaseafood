@@ -1,0 +1,31 @@
+# Training dependencies (CPU).
+#
+# macOS / Windows:  pip install -r requirements-train.txt
+#   The PyPI torch wheel is already CPU-only on these platforms.
+#
+# Linux: the PyPI wheel bundles CUDA (~2.5 GB). For a CPU-only box use
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+#   ...but note that host is blocked on this project's network. If it is blocked
+#   for you too, install from PyPI and accept the larger download.
+# certifi provides a CA bundle so weight downloads work in a fresh venv,
+# where the interpreter's own trust store is often unusable (notably on macOS).
+certifi>=2024.2.2
+
+torch>=2.2
+torchvision>=0.17
+timm>=1.0
+pillow>=10.0
+onnx>=1.16
+
+# onnxruntime is used here only for the export parity check. The floor is 1.16,
+# not 1.17: onnxruntime's newer macOS wheels are tagged macosx_13_0 and cannot
+# be installed on macOS 12 or earlier, where 1.16.3 is the newest available.
+# 1.16 loads the opset-17 graph this package exports (verified).
+onnxruntime>=1.16
+
+# onnxruntime below 1.19 is compiled against NumPy 1.x and SEGFAULTS on import
+# under NumPy 2 ("_ARRAY_API not found"), so numpy must stay on 1.x wherever an
+# older onnxruntime is what is installable. Python 3.13 has no NumPy 1.x wheels,
+# but it also only has onnxruntime 1.20+, which is NumPy 2-safe.
+numpy>=1.26,<2; python_version < "3.13"
+numpy>=2.1; python_version >= "3.13"

@@ -58,8 +58,12 @@ SELECT
 FROM location;
 
 SELECT
-  CASE WHEN COUNT(*) = 5
-        AND COUNT(*) FILTER (WHERE fish_type IS NOT NULL AND description IS NOT NULL) = 5
+  -- Counts what exists rather than asserting a fixed number: the catalogue
+  -- grows (5 at I1, 12 after the CV expansion) and a hardcoded count turns
+  -- every expansion into a spurious FAIL. What must hold is that EVERY active
+  -- species carries its V3 fields.
+  CASE WHEN COUNT(*) >= 5
+        AND COUNT(*) FILTER (WHERE fish_type IS NOT NULL AND description IS NOT NULL) = COUNT(*)
        THEN 'PASS' ELSE 'FAIL' END AS status,
   'canonical species (V3 fields)' AS check_name,
   string_agg(code || ' ' || display_name_en, ', ' ORDER BY code) AS detail

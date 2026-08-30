@@ -57,7 +57,23 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = 60 * 24 * 14  # 14 days
 
     # --- CV ----------------------------------------------------------------
-    identify_model_version: str = "mock-cv-v0.1"
+    # Directory holding the CV owner's handoff package: model.onnx,
+    # class_map.json, preprocessing.json, model_card.json. Relative paths are
+    # resolved against backend/, so the server behaves the same wherever it is
+    # launched from.
+    # Points at the model package COMMITTED to the repo, so a fresh clone and CI
+    # both find it with no setup. backend/cv_package/ is gitignored, so the old
+    # default silently produced 503 MODEL_UNAVAILABLE anywhere that directory
+    # had not been copied in by hand — which is every CI run.
+    # Relative paths resolve against backend/; override with CV_PACKAGE_DIR.
+    cv_package_dir: str = "../cv/handoff"
+    # Overrides the threshold recorded in the package. Left None, the validated
+    # value from model_card.json is used; if that is null too, every response is
+    # LOW_CONFIDENCE, which is the honest state for a model with no validated
+    # cut-off. The threshold lives here rather than in the model so it can be
+    # tuned without a redeploy.
+    cv_confidence_threshold: float | None = None
+    cv_intra_op_threads: int = 2
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

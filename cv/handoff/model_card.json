@@ -1,0 +1,619 @@
+{
+  "model_version": "cv-i1-2026-08-30",
+  "framework": "onnxruntime (exported from torchvision/mobilenetv3_small_100)",
+  "artifact": "model.onnx",
+  "opset": 17,
+  "input_contract": {
+    "backbone": "mobilenetv3_small_100",
+    "image_size": 224,
+    "resize_shorter_side": 256,
+    "colour_order": "RGB",
+    "scale": "0-1",
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ],
+    "layout": "NCHW",
+    "dtype": "float32",
+    "interpolation": "bilinear",
+    "exif_transpose": true,
+    "max_upload_bytes": 10485760,
+    "accepted_formats": [
+      "JPEG",
+      "PNG",
+      "WEBP"
+    ]
+  },
+  "num_classes": 9,
+  "onnx_parity_max_abs_delta": 2.222321927547455e-05,
+  "confidence_threshold": 0.5,
+  "metrics": {
+    "checkpoint": "artifacts/model_stage_b.pt",
+    "backbone": "mobilenetv3_small_100",
+    "splits": [
+      {
+        "split": "val",
+        "status": "OK",
+        "n": 202,
+        "accuracy": 0.8168,
+        "macro_f1": 0.7644,
+        "top3_hit_rate": 0.9554,
+        "per_class": [
+          {
+            "class_code": "SF001",
+            "label": "Kembung / Pelaling",
+            "precision": 0.8857,
+            "recall": 0.8158,
+            "f1": 0.8493,
+            "support": 38
+          },
+          {
+            "class_code": "SF002",
+            "label": "Bawal Hitam",
+            "precision": 0.913,
+            "recall": 0.9545,
+            "f1": 0.9333,
+            "support": 22
+          },
+          {
+            "class_code": "SF006",
+            "label": "Bawal Putih",
+            "precision": 0.5,
+            "recall": 0.5,
+            "f1": 0.5,
+            "support": 8
+          },
+          {
+            "class_code": "SF007",
+            "label": "Cencaru",
+            "precision": 0.6571,
+            "recall": 0.7188,
+            "f1": 0.6866,
+            "support": 32
+          },
+          {
+            "class_code": "SF008",
+            "label": "Jenahak",
+            "precision": 0.9565,
+            "recall": 0.9167,
+            "f1": 0.9362,
+            "support": 24
+          },
+          {
+            "class_code": "SF009",
+            "label": "Kerisi",
+            "precision": 0.75,
+            "recall": 0.75,
+            "f1": 0.75,
+            "support": 12
+          },
+          {
+            "class_code": "SF010",
+            "label": "Pelata",
+            "precision": 0.375,
+            "recall": 0.6,
+            "f1": 0.4615,
+            "support": 5
+          },
+          {
+            "class_code": "SF011",
+            "label": "Selar Kuning",
+            "precision": 0.9524,
+            "recall": 0.8696,
+            "f1": 0.9091,
+            "support": 23
+          },
+          {
+            "class_code": "SF012",
+            "label": "Tenggiri",
+            "precision": 0.8649,
+            "recall": 0.8421,
+            "f1": 0.8533,
+            "support": 38
+          }
+        ],
+        "confusion_matrix": {
+          "labels": [
+            "SF001",
+            "SF002",
+            "SF006",
+            "SF007",
+            "SF008",
+            "SF009",
+            "SF010",
+            "SF011",
+            "SF012"
+          ],
+          "rows_are_true": true,
+          "matrix": [
+            [
+              31,
+              0,
+              1,
+              4,
+              0,
+              0,
+              0,
+              1,
+              1
+            ],
+            [
+              0,
+              21,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              2,
+              4,
+              1,
+              0,
+              0,
+              1,
+              0,
+              0
+            ],
+            [
+              1,
+              0,
+              0,
+              23,
+              0,
+              2,
+              2,
+              0,
+              4
+            ],
+            [
+              0,
+              0,
+              1,
+              1,
+              22,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              1,
+              9,
+              2,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              1,
+              0,
+              0,
+              1,
+              3,
+              0,
+              0
+            ],
+            [
+              3,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              20,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              6,
+              0,
+              0,
+              0,
+              0,
+              32
+            ]
+          ]
+        },
+        "threshold_sweep": [
+          {
+            "threshold": 0.3,
+            "coverage": 0.9752,
+            "precision_above_threshold": 0.8274,
+            "n_above": 197
+          },
+          {
+            "threshold": 0.35,
+            "coverage": 0.9653,
+            "precision_above_threshold": 0.8308,
+            "n_above": 195
+          },
+          {
+            "threshold": 0.4,
+            "coverage": 0.9505,
+            "precision_above_threshold": 0.8333,
+            "n_above": 192
+          },
+          {
+            "threshold": 0.45,
+            "coverage": 0.9059,
+            "precision_above_threshold": 0.8415,
+            "n_above": 183
+          },
+          {
+            "threshold": 0.5,
+            "coverage": 0.8663,
+            "precision_above_threshold": 0.8514,
+            "n_above": 175
+          },
+          {
+            "threshold": 0.55,
+            "coverage": 0.8267,
+            "precision_above_threshold": 0.8683,
+            "n_above": 167
+          },
+          {
+            "threshold": 0.6,
+            "coverage": 0.7871,
+            "precision_above_threshold": 0.8931,
+            "n_above": 159
+          },
+          {
+            "threshold": 0.65,
+            "coverage": 0.7178,
+            "precision_above_threshold": 0.9034,
+            "n_above": 145
+          },
+          {
+            "threshold": 0.7,
+            "coverage": 0.6634,
+            "precision_above_threshold": 0.9403,
+            "n_above": 134
+          },
+          {
+            "threshold": 0.75,
+            "coverage": 0.5891,
+            "precision_above_threshold": 0.9664,
+            "n_above": 119
+          },
+          {
+            "threshold": 0.8,
+            "coverage": 0.5396,
+            "precision_above_threshold": 0.9725,
+            "n_above": 109
+          },
+          {
+            "threshold": 0.85,
+            "coverage": 0.4703,
+            "precision_above_threshold": 0.9789,
+            "n_above": 95
+          },
+          {
+            "threshold": 0.9,
+            "coverage": 0.3812,
+            "precision_above_threshold": 1.0,
+            "n_above": 77
+          },
+          {
+            "threshold": 0.95,
+            "coverage": 0.198,
+            "precision_above_threshold": 1.0,
+            "n_above": 40
+          }
+        ]
+      },
+      {
+        "split": "test_clean",
+        "status": "OK",
+        "n": 200,
+        "accuracy": 0.78,
+        "macro_f1": 0.7171,
+        "top3_hit_rate": 0.94,
+        "per_class": [
+          {
+            "class_code": "SF001",
+            "label": "Kembung / Pelaling",
+            "precision": 0.7609,
+            "recall": 0.9211,
+            "f1": 0.8333,
+            "support": 38
+          },
+          {
+            "class_code": "SF002",
+            "label": "Bawal Hitam",
+            "precision": 0.9474,
+            "recall": 0.9,
+            "f1": 0.9231,
+            "support": 20
+          },
+          {
+            "class_code": "SF006",
+            "label": "Bawal Putih",
+            "precision": 0.6364,
+            "recall": 0.875,
+            "f1": 0.7368,
+            "support": 8
+          },
+          {
+            "class_code": "SF007",
+            "label": "Cencaru",
+            "precision": 0.6667,
+            "recall": 0.625,
+            "f1": 0.6452,
+            "support": 32
+          },
+          {
+            "class_code": "SF008",
+            "label": "Jenahak",
+            "precision": 0.8,
+            "recall": 0.8333,
+            "f1": 0.8163,
+            "support": 24
+          },
+          {
+            "class_code": "SF009",
+            "label": "Kerisi",
+            "precision": 0.625,
+            "recall": 0.4167,
+            "f1": 0.5,
+            "support": 12
+          },
+          {
+            "class_code": "SF010",
+            "label": "Pelata",
+            "precision": 0.2857,
+            "recall": 0.4,
+            "f1": 0.3333,
+            "support": 5
+          },
+          {
+            "class_code": "SF011",
+            "label": "Selar Kuning",
+            "precision": 0.8421,
+            "recall": 0.6957,
+            "f1": 0.7619,
+            "support": 23
+          },
+          {
+            "class_code": "SF012",
+            "label": "Tenggiri",
+            "precision": 0.9429,
+            "recall": 0.8684,
+            "f1": 0.9041,
+            "support": 38
+          }
+        ],
+        "confusion_matrix": {
+          "labels": [
+            "SF001",
+            "SF002",
+            "SF006",
+            "SF007",
+            "SF008",
+            "SF009",
+            "SF010",
+            "SF011",
+            "SF012"
+          ],
+          "rows_are_true": true,
+          "matrix": [
+            [
+              35,
+              0,
+              0,
+              3,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              18,
+              1,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              7,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0
+            ],
+            [
+              7,
+              0,
+              1,
+              20,
+              1,
+              0,
+              1,
+              0,
+              2
+            ],
+            [
+              0,
+              0,
+              0,
+              1,
+              20,
+              1,
+              1,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1,
+              1,
+              2,
+              5,
+              2,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1,
+              2,
+              0,
+              0,
+              2,
+              0,
+              0
+            ],
+            [
+              3,
+              0,
+              0,
+              2,
+              1,
+              0,
+              1,
+              16,
+              0
+            ],
+            [
+              1,
+              1,
+              0,
+              1,
+              1,
+              1,
+              0,
+              0,
+              33
+            ]
+          ]
+        },
+        "threshold_sweep": [
+          {
+            "threshold": 0.3,
+            "coverage": 0.975,
+            "precision_above_threshold": 0.8,
+            "n_above": 195
+          },
+          {
+            "threshold": 0.35,
+            "coverage": 0.95,
+            "precision_above_threshold": 0.8105,
+            "n_above": 190
+          },
+          {
+            "threshold": 0.4,
+            "coverage": 0.93,
+            "precision_above_threshold": 0.8172,
+            "n_above": 186
+          },
+          {
+            "threshold": 0.45,
+            "coverage": 0.88,
+            "precision_above_threshold": 0.8295,
+            "n_above": 176
+          },
+          {
+            "threshold": 0.5,
+            "coverage": 0.86,
+            "precision_above_threshold": 0.8372,
+            "n_above": 172
+          },
+          {
+            "threshold": 0.55,
+            "coverage": 0.78,
+            "precision_above_threshold": 0.8718,
+            "n_above": 156
+          },
+          {
+            "threshold": 0.6,
+            "coverage": 0.725,
+            "precision_above_threshold": 0.8966,
+            "n_above": 145
+          },
+          {
+            "threshold": 0.65,
+            "coverage": 0.675,
+            "precision_above_threshold": 0.9259,
+            "n_above": 135
+          },
+          {
+            "threshold": 0.7,
+            "coverage": 0.635,
+            "precision_above_threshold": 0.9291,
+            "n_above": 127
+          },
+          {
+            "threshold": 0.75,
+            "coverage": 0.58,
+            "precision_above_threshold": 0.9397,
+            "n_above": 116
+          },
+          {
+            "threshold": 0.8,
+            "coverage": 0.53,
+            "precision_above_threshold": 0.9434,
+            "n_above": 106
+          },
+          {
+            "threshold": 0.85,
+            "coverage": 0.46,
+            "precision_above_threshold": 0.9457,
+            "n_above": 92
+          },
+          {
+            "threshold": 0.9,
+            "coverage": 0.355,
+            "precision_above_threshold": 0.9718,
+            "n_above": 71
+          },
+          {
+            "threshold": 0.95,
+            "coverage": 0.205,
+            "precision_above_threshold": 0.9756,
+            "n_above": 41
+          }
+        ]
+      }
+    ],
+    "recommended_threshold": {
+      "basis_split": "val",
+      "value": 0.5,
+      "rule": "lowest threshold with top-1 precision >= 0.85 and coverage >= 0.60",
+      "note": "must remain configurable in the backend (08 s.10)"
+    }
+  },
+  "training_manifest_uri": null,
+  "notes": [
+    "confidence values are softmax outputs and are NOT calibrated probabilities unless a calibration study says otherwise (08 s.5)",
+    "user inference images are never persisted or reused for training (08 s.11)"
+  ]
+}
