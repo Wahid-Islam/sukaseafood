@@ -61,7 +61,12 @@ class Settings(BaseSettings):
     # class_map.json, preprocessing.json, model_card.json. Relative paths are
     # resolved against backend/, so the server behaves the same wherever it is
     # launched from.
-    cv_package_dir: str = "cv_package"
+    # Points at the model package COMMITTED to the repo, so a fresh clone and CI
+    # both find it with no setup. backend/cv_package/ is gitignored, so the old
+    # default silently produced 503 MODEL_UNAVAILABLE anywhere that directory
+    # had not been copied in by hand — which is every CI run.
+    # Relative paths resolve against backend/; override with CV_PACKAGE_DIR.
+    cv_package_dir: str = "../cv/handoff"
     # Overrides the threshold recorded in the package. Left None, the validated
     # value from model_card.json is used; if that is null too, every response is
     # LOW_CONFIDENCE, which is the honest state for a model with no validated
