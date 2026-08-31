@@ -79,7 +79,7 @@ def test_database_health(client):
     body = res.json()
     assert body["database"] == "postgresql"
     assert body["schema_applied"] is True
-        assert body["seafood_count"] == 14
+    assert body["seafood_count"] == 14
 
 
 def test_list_seafood(client):
