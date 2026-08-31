@@ -79,24 +79,26 @@ def test_database_health(client):
     body = res.json()
     assert body["database"] == "postgresql"
     assert body["schema_applied"] is True
-    assert body["seafood_count"] == 12
+        assert body["seafood_count"] == 14
 
 
 def test_list_seafood(client):
-    """Twelve species in the catalogue, nine of which the scanner can see.
+    """Fourteen species in the catalogue, nine of which the scanner can see.
 
     The catalogue is deliberately wider than the class map. SF003/4/5 have no
-    usable training imagery, and dropping them from the catalogue to match the
-    model would remove working search, WWF and cooking data that the app
-    already ships. They stay, flagged supports_cv = FALSE.
+    usable training imagery, and SF013/14 exist so the forecast engine has a
+    canonical key. Dropping any of them to match the model would remove
+    working search, WWF, cooking or forecast data. They stay, flagged
+    supports_cv = FALSE.
     """
     res = client.get("/api/v1/seafood")
     assert res.status_code == 200
     items = res.json()
-    assert len(items) == 12
+    assert len(items) == 14
     assert {i["fish_id"] for i in items} == {
         "SF001", "SF002", "SF003", "SF004", "SF005", "SF006",
         "SF007", "SF008", "SF009", "SF010", "SF011", "SF012",
+        "SF013", "SF014",
     }
 
 
@@ -355,7 +357,7 @@ def test_every_scannable_species_leads_somewhere(client):
     # hard-coded, so adding a class to the model cannot leave this test stale.
     scannable = [
         i["fish_id"] for i in client.get("/api/v1/seafood").json()
-        if i["fish_id"] not in {"SF003", "SF004", "SF005"}
+        if i["fish_id"] not in {"SF003", "SF004", "SF005", "SF013", "SF014"}
     ]
     assert len(scannable) == 9
 
@@ -399,7 +401,7 @@ def test_class_map_matches_the_registered_model(client):
     mismatch that produces confidently wrong answers with no error anywhere.
     """
     items = client.get("/api/v1/seafood").json()
-    assert len(items) == 12
+    assert len(items) == 14
 
     body = client.post(
         "/api/v1/identify", files={"file": ("f.jpg", _jpeg(), "image/jpeg")}

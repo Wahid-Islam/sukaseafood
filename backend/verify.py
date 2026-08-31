@@ -115,7 +115,7 @@ def main() -> int:
               f"{body.get('seafood_count')} species" if db_ok else str(body)[:80])
 
         status, items = request(f"{base}/seafood")
-        check(status == 200 and isinstance(items, list) and len(items) == 12,
+        check(status == 200 and isinstance(items, list) and len(items) == 14,
               "GET /seafood returns the catalogue",
               f"{len(items) if isinstance(items, list) else '?'} items")
 
