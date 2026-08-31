@@ -1,0 +1,9 @@
+metric,value
+Forecast rows,48
+Forecastable fish,12
+Forecast weeks per fish,4
+Reference week,2026-08-17
+First forecast week,2026-08-24
+Last forecast week,2026-09-14
+Location,Selangor
+Forecast engine,MODEL_SELECTION_V1

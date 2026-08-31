@@ -5,7 +5,7 @@
 -- PostgreSQL schema — DDL only (17 tables, 8 enums).
 --
 -- Source of truth for the I1 "Database & Data Structure Design" handoff.
--- Runs against a fresh/empty schema on PostgreSQL 14+ (local Docker or Supabase).
+-- Runs against a fresh/empty schema on PostgreSQL 14+ (local Docker or Cloud SQL).
 --
 -- This file creates STRUCTURE ONLY. Reference and canonical data live in
 -- ../seed/*.sql and are applied after this file, in filename order:

@@ -6,7 +6,7 @@
 -- guarantees every price row the ETL loads can resolve to a location_id.
 --
 -- Keys come from suka_uuid5(), so ids are identical in local Docker, CI and
--- Supabase. Idempotent: safe to re-run.
+-- Cloud SQL. Idempotent: safe to re-run.
 --
 -- Requires: schema/i1_functions_indexes.sql
 

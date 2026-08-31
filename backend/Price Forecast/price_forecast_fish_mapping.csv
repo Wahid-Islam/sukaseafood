@@ -1,0 +1,23 @@
+canonical_name,wwf_secondary_name,scientific_name,pricecatcher_item_code,malaysian_market_name,match_quality,notes
+Bawal Hitam,Black Pomfret,Parastromateus niger,43,Bawal Hitam,Strong,WWF main name retained as canonical display name.
+Bawal Putih,Chinese Silver Pomfret,Pampus chinensis,1475,Bawal Putih,Strong in project mapping; species caveat,"WWF uses Bawal Putih for Pampus chinensis, while Malaysian sources also use Bawal Putih for Pampus argenteus. Treat this as a project-level name mapping, not a species-level scientific equivalence."
+Cencaru,Hardtail Scad,Megalaspis cordyla,47,Cencaru,Strong,Malaysian common name Cencaru; WWF main name retained.
+Ikan Gelama,Croakers,Sciaenidae spp.,49,Ikan Gelama,Good,WWF groups Gelama at family level (Sciaenidae spp.).
+Jenahak,John's Snapper,Lutjanus johnii,51,Jenahak,Strong,Second PriceCatcher code 1915 maps to the same canonical fish.
+Jenahak,John's Snapper,Lutjanus johnii,1915,Jenahak,Strong,Second PriceCatcher code 1915 maps to the same canonical fish.
+Kembung / Pelaling,Indian Mackerel,Rastrelliger kanagurta,55,Kembung,Strong,Second PriceCatcher code 1476 maps to the same canonical fish.
+Kembung / Pelaling,Indian Mackerel,Rastrelliger kanagurta,1476,Kembung,Strong,Second PriceCatcher code 1476 maps to the same canonical fish.
+Ikan Merah,Red Snapper,Lutjanus sebae,60,Merah,Good,WWF canonical display name retained; Malaysian market commonly uses Ikan Merah/Merah.
+Ikan Merah,Red Snapper,Lutjanus sebae,1554,Merah,Good,Second PriceCatcher code 1554 maps to the same canonical fish.
+Parang,Dorab Wolf-herring,Chirocentrus dorab,66,Parang,Good,WWF canonical display name retained.
+Parang,Dorab Wolf-herring,Chirocentrus dorab,1917,Parang,Good,Second PriceCatcher code 1917 maps to the same canonical fish.
+Pelata,Blackfin Scad,Alepes melanoptera,70,Selar Pelata / Pelata,Strong,WWF uses Pelata as the main common name; Malaysian usage includes Selar Pelata.
+Selar Kuning,Yellowtail Scad,Selaroides leptolepis,69,Selar Kuning,Strong,WWF canonical display name retained.
+Kerisi,Treadfin Breams,Nemipterus japonicus,1436,Kerisi,Strong,WWF spells the secondary name 'Treadfin Breams'; the standard English name is generally 'Threadfin Bream'.
+Siakap Putih,Asian seabass / Barramundi,Lates calcarifer,1437,Siakap,Name-level,PriceCatcher uses Siakap; WWF uses Siakap Putih. Use WWF name in the app to keep the sustainability→price journey consistent.
+Demuduk / Cupak / Cermin,Ponyfish,Not specified in project mapping,1916,Demuduk / Cupak / Cermin,Strong in project mapping,The public WWF guide checked here does not expose this record; this row follows your project mapping screenshot rather than independently asserting a WWF taxonomy.
+Terubok,Longtail Shad,Tenualosa macrura,1918,Terubok,Strong,LKIM also lists Terubok / Terubok Laut.
+Tenggiri,Narrow-barred Spanish Mackerel,Scomberomorus commerson,79,Tenggiri,Variant mapping required,WWF has both Reduce (hook and line) and Avoid (gillnets) records for this species; PriceCatcher code alone does not encode catch method.
+Tenggiri,Narrow-barred Spanish Mackerel,Scomberomorus commerson,82,Tenggiri,Variant mapping required,WWF has both Reduce (hook and line) and Avoid (gillnets) records for this species; PriceCatcher code alone does not encode catch method.
+Tenggiri,Narrow-barred Spanish Mackerel,Scomberomorus commerson,1438,Tenggiri,Variant mapping required,WWF has both Reduce (hook and line) and Avoid (gillnets) records for this species; PriceCatcher code alone does not encode catch method.
+Tongkol,Longtail Tuna,Thunnus tonggol,83,Tongkol,Good,WWF canonical display name retained.

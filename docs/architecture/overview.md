@@ -65,7 +65,7 @@ derived from `code` (`SF001` → `seafood/SF001.jpg`).
 Future adapters (non-breaking):
 
 - Real CV model behind `POST /identify` (Fish-Vista), versioned in `cv_model_version`
-- Supabase as the hosted Postgres target — same schema, same `apply.sh`
+- Firebase Cloud SQL as the hosted Postgres target — same schema, same `apply.sh`
 - OBIS / MyBIS for marine context (Iteration 2+)
 
 ## Fallback product states

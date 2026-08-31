@@ -8,7 +8,7 @@ This revision EXECUTES backend/db/schema/*.sql rather than rebuilding the schema
 with op.create_table() calls. That is intentional:
 
   * the SQL file is the artifact the team reviewed and the one applied directly
-    to Supabase, so it must stay the single definition of the schema
+    to Cloud SQL, so it must stay the single definition of the schema
   * expression indexes, partial unique indexes and the suka_uuid5() function all
     round-trip through Alembic's autogenerate imperfectly
   * a second ORM-derived definition of the same tables would drift from the

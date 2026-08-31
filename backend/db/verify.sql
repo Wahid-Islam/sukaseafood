@@ -110,9 +110,65 @@ SELECT
   'I1 price_summary removed' AS check_name,
   'price_period_summary is the V3 derived price layer' AS detail;
 
+-- Confirms v3_forecast_contract.sql was applied, not just v3_initial_schema.sql.
+-- Without these columns the forecast endpoint returns rows with no reference
+-- price, horizon or quality flag, and the app cannot present a range at all.
+SELECT
+  CASE WHEN COUNT(*) = 7 THEN 'PASS' ELSE 'FAIL' END AS status,
+  'forecast contract columns (33B)' AS check_name,
+  COUNT(*) || '/7 present on price_forecast' AS detail
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'price_forecast'
+  AND column_name IN (
+    'source_snapshot_id','forecast_origin_date','horizon_weeks',
+    'current_reference_price','range_outlook','quality_status','model_used'
+  );
+
+SELECT
+  CASE WHEN COUNT(*) = 1 THEN 'PASS' ELSE 'FAIL' END AS status,
+  'one active forecast model version' AS check_name,
+  COALESCE(string_agg(version_name || ' (' || algorithm || ')', ', '), 'none') AS detail
+FROM forecast_model_version WHERE active;
+
+-- Four weeks per fish, or the app renders a short chart with no way to tell the
+-- user weeks are missing. Direction is reported separately from the range: most
+-- fish are NO_STRONG_SIGNAL, and that is the engine's honest answer.
+SELECT
+  CASE WHEN COUNT(*) > 0
+        AND COUNT(*) FILTER (WHERE weeks <> 4) = 0
+       THEN 'PASS' ELSE 'CHECK' END AS status,
+  'forecast horizon per fish' AS check_name,
+  COUNT(*) || ' fish, ' || COALESCE(SUM(weeks), 0) || ' rows; ' ||
+  COUNT(*) FILTER (WHERE weeks <> 4) || ' incomplete' AS detail
+FROM (
+  SELECT pf.seafood_item_id, COUNT(*) AS weeks
+  FROM price_forecast pf
+  JOIN forecast_model_version mv USING (forecast_model_version_id)
+  WHERE mv.active
+  GROUP BY pf.seafood_item_id
+) x;
+
+SELECT
+  CASE WHEN COUNT(*) FILTER (
+         WHERE outlook IS NOT NULL
+           AND outlook NOT IN ('LIKELY_INCREASE','LIKELY_DECREASE','NO_STRONG_SIGNAL')
+       ) = 0
+       AND COUNT(*) FILTER (WHERE source_snapshot_id IS NULL) = 0
+       THEN 'PASS' ELSE 'FAIL' END AS status,
+  'forecast outlook vocabulary + traceability' AS check_name,
+  COUNT(*) FILTER (WHERE outlook = 'NO_STRONG_SIGNAL') || ' NO_STRONG_SIGNAL, ' ||
+  COUNT(*) FILTER (WHERE outlook = 'LIKELY_INCREASE')  || ' LIKELY_INCREASE, ' ||
+  COUNT(*) FILTER (WHERE outlook = 'LIKELY_DECREASE')  || ' LIKELY_DECREASE, ' ||
+  COUNT(*) FILTER (WHERE source_snapshot_id IS NULL)   || ' untraceable' AS detail
+FROM price_forecast pf
+JOIN forecast_model_version mv USING (forecast_model_version_id)
+WHERE mv.active;
+
 \echo
 \echo Empty by design until the ETL runs: pricecatcher_item, pricecatcher_premise,
-\echo price_item_mapping, price_period_summary, price_trend_point, price_forecast,
-\echo forecast_model_version, supply_landing_point, recipe*, cv_model_version,
-\echo cv_class_mapping.
+\echo price_item_mapping, price_period_summary, price_trend_point,
+\echo supply_landing_point, recipe*.
+\echo Seeded: cv_model_version, cv_class_mapping (06), price_forecast and
+\echo forecast_model_version (09).
 \echo

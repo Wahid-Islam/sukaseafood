@@ -1,7 +1,7 @@
 """Pydantic request/response schemas."""
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -54,6 +54,93 @@ class PriceContextOut(BaseModel):
     disclaimer: str = (
         "Observed price context from OpenDOSM PriceCatcher — "
         "not a nationally representative average."
+    )
+
+
+class ForecastLocationOut(BaseModel):
+    """The location a forecast applies to. Production scope is Selangor."""
+
+    location_id: uuid.UUID
+    state_name: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ForecastReferenceOut(BaseModel):
+    """The observed price the forecast was made from.
+
+    Carried alongside the forecast so the UI can show "expected RM15.90,
+    currently RM15.90" without a second request, and so the comparison is
+    always against the week the model actually used rather than whatever the
+    latest observation happens to be.
+    """
+
+    week_start: date | None
+    price: float | None
+
+
+class ForecastWeekOut(BaseModel):
+    """One forecast week.
+
+    Three prices, not one. `expected_price` is the model point estimate and
+    the bounds are the prediction interval; presenting the point estimate alone
+    would imply a precision the model does not have.
+    """
+
+    forecast_week_start: date
+    horizon_weeks: int | None
+    expected_price: float
+    lower_bound: float
+    upper_bound: float
+
+    # Directional verdict. NO_STRONG_SIGNAL is a real answer meaning the
+    # evidence did not justify claiming a move — it must not be relabelled
+    # STABLE, which would assert something the model never concluded.
+    outlook: str | None
+    outlook_label: str | None
+    directional_outlook_label: str | None
+
+    # VALID or SPARSE_DATA. A SPARSE_DATA forecast is displayable but rests on
+    # thin recent PriceCatcher coverage, and the UI must say so rather than
+    # presenting it with the same confidence as a dense series.
+    quality_status: str | None
+    model_used: str | None
+
+
+class ForecastModelOut(BaseModel):
+    """Which model version produced the forecast, for traceability."""
+
+    model_version_id: uuid.UUID
+    version_name: str
+    algorithm: str
+    interval_level: float | None
+
+    # The contract names these fields model_*; clearing the protected namespace
+    # keeps that naming without Pydantic shadowing warnings.
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+
+class PriceForecastOut(BaseModel):
+    """GET /seafood/{fish_id}/forecast — the Step 33C contract.
+
+    Everything here is computed upstream by the R pipeline and stored. The
+    client renders it; it does not model, re-range, re-date or re-interpret
+    anything.
+    """
+
+    fish_id: str
+    seafood_item_id: uuid.UUID
+    canonical_name: str
+    display_name: str
+    location: ForecastLocationOut
+    reference: ForecastReferenceOut
+    forecast: list[ForecastWeekOut]
+    model: ForecastModelOut
+    generated_at: datetime | None
+    source_name: str = "SukaSeafood Price Forecast Engine"
+    disclaimer: str = (
+        "Modelled outlook derived from OpenDOSM PriceCatcher observations. "
+        "An estimated range, not an official or guaranteed price."
     )
 
 

@@ -1,0 +1,145 @@
+openapi: 3.0.3
+info:
+  title: SukaSeafood Forecast API
+  version: 1.0.0
+  description: |
+    API contract for serving SukaSeafood seafood price forecasts.
+
+servers:
+  - url: https://api.example.com
+
+paths:
+  /api/seafood/{seafood_item_id}/forecast:
+    get:
+      summary: Get the current seafood price forecast
+      parameters:
+        - name: seafood_item_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: location_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: weeks
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 4
+            default: 4
+      responses:
+        "200":
+          description: Current forecast
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForecastResponse"
+        "400":
+          description: Invalid location or request
+        "404":
+          description: Seafood or forecast not found
+
+components:
+  schemas:
+    ForecastResponse:
+      type: object
+      required:
+        - seafood_item_id
+        - canonical_name
+        - reference
+        - forecast
+        - model
+        - generated_at
+      properties:
+        seafood_item_id:
+          type: string
+          format: uuid
+        canonical_name:
+          type: string
+        reference:
+          type: object
+          required:
+            - week_start
+            - price
+          properties:
+            week_start:
+              type: string
+              format: date
+            price:
+              type: number
+              format: double
+        forecast:
+          type: array
+          minItems: 1
+          maxItems: 4
+          items:
+            $ref: "#/components/schemas/ForecastWeek"
+        model:
+          type: object
+          required:
+            - model_version_id
+            - version_name
+            - algorithm
+          properties:
+            model_version_id:
+              type: string
+              format: uuid
+            version_name:
+              type: string
+            algorithm:
+              type: string
+        generated_at:
+          type: string
+          format: date-time
+
+    ForecastWeek:
+      type: object
+      required:
+        - forecast_week_start
+        - horizon_weeks
+        - expected_price
+        - lower_bound
+        - upper_bound
+        - outlook
+        - quality_status
+      properties:
+        forecast_week_start:
+          type: string
+          format: date
+        horizon_weeks:
+          type: integer
+          minimum: 1
+          maximum: 4
+        expected_price:
+          type: number
+          format: double
+          minimum: 0
+        lower_bound:
+          type: number
+          format: double
+          minimum: 0
+        upper_bound:
+          type: number
+          format: double
+          minimum: 0
+        outlook:
+          type: string
+          enum:
+            - LIKELY_INCREASE
+            - LIKELY_DECREASE
+            - NO_STRONG_SIGNAL
+        outlook_label:
+          type: string
+        directional_outlook_label:
+          type: string
+        quality_status:
+          type: string
+          enum:
+            - VALID
+            - SPARSE_DATA

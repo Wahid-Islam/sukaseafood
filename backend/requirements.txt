@@ -15,6 +15,8 @@ asyncpg>=0.30.0          # async driver used by the application
 psycopg[binary]>=3.2.0   # sync driver used by Alembic
 greenlet>=3.0.0          # required by SQLAlchemy's async bridge
 alembic>=1.14.0
+# Cloud Run talks to Cloud SQL with IAM — no static database password.
+cloud-sql-python-connector[asyncpg]>=1.18.0
 
 # --- CV inference (08 — CV Integration Contract) -----------------------------
 # Training dependencies live in cv/requirements-train.txt; the API only needs

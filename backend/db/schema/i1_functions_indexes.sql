@@ -20,7 +20,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 --
 -- Reference rows (locations, data sources, cooking methods, the 5 canonical
 -- species) must carry the SAME uuid in every environment — local Docker, CI,
--- and Supabase — because price_summary, price_trend_point and the CV class map
+-- and Cloud SQL — because price_summary, price_trend_point and the CV class map
 -- all reference them by id. gen_random_uuid() would produce a different key per
 -- environment and make rollups non-portable.
 --

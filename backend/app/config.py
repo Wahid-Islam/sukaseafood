@@ -24,6 +24,11 @@ class Settings(BaseSettings):
         default="postgresql+asyncpg://sukaseafood:sukaseafood@localhost:5432/sukaseafood",
         description="Async SQLAlchemy URL (asyncpg driver).",
     )
+    # Cloud Run: the Cloud SQL Python Connector talks to this instance over
+    # IAM and does not need DATABASE_URL (and must not use a password).
+    instance_connection_name: str = ""
+    db_user: str = ""
+    db_name: str = ""
     db_pool_size: int = 5
     db_max_overflow: int = 10
     db_pool_recycle_seconds: int = 1800
@@ -33,7 +38,7 @@ class Settings(BaseSettings):
     # connection is bound to the event loop that created it, and the test suite
     # opens a fresh loop per test, so a reused connection raises
     # "attached to a different loop". Also the correct setting behind an
-    # external pooler such as PgBouncer or Supabase's transaction pooler, which
+    # external pooler such as PgBouncer or a managed transaction pooler, which
     # does its own pooling.
     db_use_null_pool: bool = False
 
@@ -82,7 +87,7 @@ class Settings(BaseSettings):
     def _require_async_postgres(cls, v: str) -> str:
         """Fail fast on a driver the async engine cannot use."""
         if v.startswith("postgres://"):
-            # Heroku/Supabase-style URLs; SQLAlchemy needs the full scheme.
+            # libpq-style short scheme; SQLAlchemy needs the full scheme.
             v = v.replace("postgres://", "postgresql://", 1)
         if v.startswith("postgresql://"):
             v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
@@ -99,6 +104,10 @@ class Settings(BaseSettings):
     def sync_database_url(self) -> str:
         """Blocking URL for Alembic, which runs migrations synchronously."""
         return self.database_url.replace("postgresql+asyncpg://", "postgresql+psycopg://", 1)
+
+    @property
+    def uses_cloud_sql_connector(self) -> bool:
+        return bool(self.instance_connection_name.strip())
 
     @property
     def is_production(self) -> bool:

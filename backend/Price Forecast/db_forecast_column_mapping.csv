@@ -1,0 +1,17 @@
+staging_column,database_table,database_column,handling
+canonical_name,seafood_item,seafood_item_id,Resolve by canonical seafood master; never use name as stored FK.
+location_name,location,location_id,Resolve Selangor location UUID.
+model_version_name,forecast_model_version,forecast_model_version_id,Resolve active model version UUID.
+forecast_id,price_forecast,price_forecast_id,Use generated UUID or preserve deterministic UUID only if backend policy allows.
+forecast_origin_date,price_forecast,forecast_origin_date,Completed reference week end date.
+forecast_week_start,price_forecast,forecast_week_start,Monday forecast week start.
+horizon_weeks,price_forecast,horizon_weeks,1 to 4.
+current_reference_price,price_forecast,current_reference_price,Latest completed-week reference price.
+expected_price,price_forecast,expected_price,Point estimate.
+lower_bound,price_forecast,lower_bound,Lower forecast boundary.
+upper_bound,price_forecast,upper_bound,Upper forecast boundary.
+outlook,price_forecast,outlook,LIKELY_INCREASE / LIKELY_DECREASE / AR​​OUND_CURRENT_LEVELS.
+quality_status,price_forecast,quality_status,VALID / SPARSE_DATA.
+generated_at,price_forecast,generated_at,UTC timestamp.
+model_version_name,forecast_model_version,forecast_model_version_id,Required FK.
+source_snapshot_id,price_forecast,source_snapshot_id,Resolved to PriceCatcher source snapshot used for forecast.

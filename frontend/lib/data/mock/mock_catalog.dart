@@ -242,8 +242,58 @@ class MockCatalog {
     ),
   ];
 
-  static SeafoodItem byId(String id) =>
-      items.firstWhere((SeafoodItem e) => e.id == id);
+  /// Canonical backend codes mapped onto the prototype catalogue.
+  ///
+  /// The backend catalogue is the real one: fourteen canonical species, keyed
+  /// SF001…SF014. This prototype content covers seven of them. Scanning or
+  /// deep-linking any species produces an `SF` code, so ids arriving from the
+  /// API have to resolve here or the screen has nothing to render.
+  ///
+  /// Deliberately partial. The species not listed have no prototype content,
+  /// and inventing sustainability copy for them so a screen looks complete
+  /// would put unsourced claims in front of a user. [tryById] returns null for
+  /// those and the caller shows a live-data-only view instead.
+  static const Map<String, String> _codeAliases = <String, String>{
+    'SF001': 'kembung',
+    'SF003': 'ikan_merah',
+    'SF004': 'tilapia',
+    'SF011': 'selar',
+    'SF012': 'tenggiri',
+    'SF014': 'siakap',
+  };
+
+  /// Canonical backend code for API calls.
+  ///
+  /// Home and Explore still navigate with prototype slugs (`tenggiri`).
+  /// `/seafood/{id}/forecast` only accepts `SF001`…`SF014` or a UUID, so a
+  /// slug has to be reversed here or the outlook 404s as a missing fish.
+  static String apiFishId(String id) {
+    final String trimmed = id.trim();
+    if (trimmed.toUpperCase().startsWith('SF')) {
+      return trimmed.toUpperCase();
+    }
+    for (final MapEntry<String, String> entry in _codeAliases.entries) {
+      if (entry.value == trimmed) return entry.key;
+    }
+    return trimmed;
+  }
+
+  /// Resolve a slug or backend code, or null when there is no prototype entry.
+  static SeafoodItem? tryById(String id) {
+    final String key = _codeAliases[id.toUpperCase()] ?? id;
+    for (final SeafoodItem item in items) {
+      if (item.id == key) return item;
+    }
+    return null;
+  }
+
+  static SeafoodItem byId(String id) {
+    final SeafoodItem? item = tryById(id);
+    if (item == null) {
+      throw ArgumentError('No prototype catalogue entry for "$id"');
+    }
+    return item;
+  }
 
   static SeafoodItem get featured =>
       items.firstWhere((SeafoodItem e) => e.featured);

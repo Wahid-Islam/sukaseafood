@@ -13,6 +13,7 @@ from app.schemas import (
     HealthOut,
     IdentifyResponse,
     PriceContextOut,
+    PriceForecastOut,
     SearchResponse,
     SeafoodProfileOut,
     SeafoodSummaryOut,
@@ -20,9 +21,15 @@ from app.schemas import (
 )
 from app.models import SeafoodItem
 from app.services import cv as cv_service
+from app.services import forecast as forecast_service
 from app.services import seafood as seafood_service
 
 router = APIRouter()
+
+
+def _error(code: str, message: str) -> dict:
+    """The standard error envelope."""
+    return {"error": {"code": code, "message": message, "details": {}}}
 
 
 @router.get("/health", response_model=HealthOut)
@@ -113,6 +120,54 @@ async def seafood_price(
     return await seafood_service.get_price_context(db, fish_id)
 
 
+@router.get("/seafood/{fish_id}/forecast", response_model=PriceForecastOut)
+async def seafood_price_forecast(
+    fish_id: str,
+    location_id: str | None = Query(
+        None, description="Defaults to Selangor, the engine's production scope."
+    ),
+    weeks: int = Query(
+        forecast_service.DEFAULT_WEEKS,
+        ge=1,
+        le=forecast_service.DEFAULT_WEEKS,
+        description="Forecast weeks to return, nearest first.",
+    ),
+    db: AsyncSession = Depends(get_db),
+) -> PriceForecastOut:
+    """Modelled four-week price outlook for one canonical species (Step 33C).
+
+    Every value is generated upstream by the R forecasting pipeline and stored.
+    The client presents it and must not recompute ranges, direction, dates or
+    confidence — the whole point of serving it from the database is that what a
+    shopper sees is what the validated engine actually produced.
+
+    A fish with no forecast is normal rather than exceptional: the engine only
+    covers species that pass its data-eligibility rules, so 404
+    FORECAST_UNAVAILABLE is a state the UI is expected to render.
+    """
+    item = await seafood_service.get_seafood_by_id(db, fish_id)
+    if item is None:
+        raise HTTPException(
+            status_code=404,
+            detail=_error("SEAFOOD_NOT_FOUND", "Seafood item was not found."),
+        )
+
+    try:
+        return await forecast_service.get_forecast(
+            db, item, location_id=location_id, weeks=weeks
+        )
+    except forecast_service.InvalidLocation as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=_error("INVALID_LOCATION", str(exc)),
+        ) from exc
+    except forecast_service.ForecastUnavailable as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=_error("FORECAST_UNAVAILABLE", str(exc)),
+        ) from exc
+
+
 @router.get("/cooking/{method}", response_model=CookingRecommendationOut)
 async def cooking_recommendations(
     method: str,
@@ -128,11 +183,6 @@ async def cooking_recommendations(
 
 ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
-
-
-def _error(code: str, message: str) -> dict:
-    """The standard error envelope."""
-    return {"error": {"code": code, "message": message, "details": {}}}
 
 
 @router.post("/identify", response_model=IdentifyResponse)
@@ -226,6 +276,15 @@ async def sources() -> list[SourceMetaOut]:
             role="Broader supply context",
             url="https://open.dosm.gov.my/",
             license_note="Not species-level forecasting.",
+        ),
+        SourceMetaOut(
+            name="SukaSeafood Price Forecast Engine",
+            role="Four-week modelled price outlook",
+            url="https://open.dosm.gov.my/",
+            license_note=(
+                "Our own model over PriceCatcher observations. An estimated "
+                "range, not an official or guaranteed price."
+            ),
         ),
         SourceMetaOut(
             name="Fish-Vista (Imageomics)",

@@ -5,7 +5,12 @@
 
 BEGIN;
 
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+DO $$
+BEGIN
+  CREATE EXTENSION IF NOT EXISTS pgcrypto;
+EXCEPTION WHEN insufficient_privilege THEN
+  RAISE NOTICE 'pgcrypto not installable by %; suka_uuid5 will use uuid-ossp.', current_user;
+END $$;
 
 -- =========================================================
 -- Deterministic id generation
@@ -14,31 +19,59 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 -- Reference rows must carry the SAME uuid in every environment.
 -- suka_uuid5('seafood_item:SF001') matches Python:
 --   uuid.uuid5(uuid.UUID('6f9619ff-8b86-d011-b42d-00c04fc964ff'), 'seafood_item:SF001')
+--
+-- Two implementations, one result. UUIDv5 is fully specified, so uuid-ossp's
+-- uuid_generate_v5 and the hand-rolled SHA-1 construction below agree byte for
+-- byte; only the SHA-1 primitive differs in where it comes from. Cloud SQL
+-- ships uuid-ossp but refuses pgcrypto to non-superusers, while a plain
+-- PostgreSQL container is usually the other way round, so the function is
+-- defined against whichever one the database actually has.
 
-CREATE OR REPLACE FUNCTION suka_uuid5(p_name TEXT)
-RETURNS UUID
-LANGUAGE sql
-IMMUTABLE
-STRICT
-AS $fn$
-  WITH h AS (
-    SELECT substring(
-             digest(
-               decode('6f9619ff8b86d011b42d00c04fc964ff', 'hex') || convert_to(p_name, 'utf8'),
-               'sha1'
-             )
-             FROM 1 FOR 16
-           ) AS b
-  )
-  SELECT encode(
-           set_byte(
-             set_byte(b, 6, (get_byte(b, 6) & 15) | 80),
-             8, (get_byte(b, 8) & 63) | 128
-           ),
-           'hex'
-         )::uuid
-  FROM h;
-$fn$;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'uuid_generate_v5') THEN
+    EXECUTE $ddl$
+      CREATE OR REPLACE FUNCTION suka_uuid5(p_name TEXT)
+      RETURNS UUID
+      LANGUAGE sql
+      IMMUTABLE
+      STRICT
+      AS $fn$
+        SELECT uuid_generate_v5('6f9619ff-8b86-d011-b42d-00c04fc964ff'::uuid, p_name);
+      $fn$;
+    $ddl$;
+  ELSIF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'digest') THEN
+    EXECUTE $ddl$
+      CREATE OR REPLACE FUNCTION suka_uuid5(p_name TEXT)
+      RETURNS UUID
+      LANGUAGE sql
+      IMMUTABLE
+      STRICT
+      AS $fn$
+        WITH h AS (
+          SELECT substring(
+                   digest(
+                     decode('6f9619ff8b86d011b42d00c04fc964ff', 'hex') || convert_to(p_name, 'utf8'),
+                     'sha1'
+                   )
+                   FROM 1 FOR 16
+                 ) AS b
+        )
+        SELECT encode(
+                 set_byte(
+                   set_byte(b, 6, (get_byte(b, 6) & 15) | 80),
+                   8, (get_byte(b, 8) & 63) | 128
+                 ),
+                 'hex'
+               )::uuid
+        FROM h;
+      $fn$;
+    $ddl$;
+  ELSE
+    RAISE EXCEPTION
+      'suka_uuid5 needs SHA-1: install uuid-ossp or pgcrypto, or grant CREATE on the database.';
+  END IF;
+END $$;
 
 COMMENT ON FUNCTION suka_uuid5(TEXT) IS
   'Deterministic UUIDv5 over the SukaSeafood namespace. Matches Python uuid.uuid5 with namespace 6f9619ff-8b86-d011-b42d-00c04fc964ff.';

@@ -12,7 +12,14 @@ class SeafoodDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final SeafoodItem item = MockCatalog.byId(seafoodId);
+    final SeafoodItem? prototype = MockCatalog.tryById(seafoodId);
+    if (prototype == null) {
+      // A confirmed scan can land on any of the fourteen canonical species,
+      // and the prototype catalogue covers seven. Sustainability and cooking
+      // copy for the rest is not in this build; the live price outlook is.
+      return _ProfileUnavailable(fishId: seafoodId);
+    }
+    final SeafoodItem item = prototype;
     final Color tone = AppTheme.classificationColor(item.classification);
 
     return Scaffold(
@@ -363,6 +370,69 @@ class _Fact extends StatelessWidget {
             value,
             textAlign: TextAlign.center,
             style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Landing state for a canonical species this build has no profile content for.
+///
+/// Deliberately sparse. A confident-looking profile assembled from defaults
+/// would be worse than an empty one: sustainability advice is the whole point
+/// of the screen, and inventing it for an unsourced species would mislead
+/// exactly the decision the app exists to inform.
+class _ProfileUnavailable extends StatelessWidget {
+  const _ProfileUnavailable({required this.fishId});
+
+  final String fishId;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.foam,
+      appBar: AppBar(
+        title: const Text('Species confirmed'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.pop(),
+        ),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+        children: [
+          SoftCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  fishId,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w800, fontSize: 20),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Sustainability and cooking guidance for this species is not '
+                  'in this build yet. We would rather show nothing than guess a '
+                  'rating.',
+                  style: TextStyle(color: AppColors.muted),
+                ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.navy,
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () => context.push('/price/$fishId'),
+                    icon: const Icon(Icons.show_chart),
+                    label: const Text('See price outlook'),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

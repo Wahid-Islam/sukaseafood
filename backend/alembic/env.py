@@ -9,7 +9,7 @@ Two things worth knowing before editing this file:
 2. `target_metadata` is set so `alembic revision --autogenerate` can diff FUTURE
    changes against the ORM. The FIRST revision does not come from autogenerate —
    it executes backend/db/schema/*.sql verbatim, because that SQL is the artifact
-   the team reviewed and the one applied to Supabase. Regenerating it from ORM
+   the team reviewed and the one applied to Cloud SQL. Regenerating it from ORM
    metadata would create a second, subtly different definition of the same
    schema.
 """

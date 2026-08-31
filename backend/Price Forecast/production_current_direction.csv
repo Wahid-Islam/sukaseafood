@@ -1,0 +1,13 @@
+canonical_name,selected_strategy,validation_accuracy,validation_call_rate,current_price,current_week,strategy_signal,strategy_change,directional_outlook,directional_outlook_label
+Bawal Hitam,model_signal,57.14285714285714,20.8955223880597,28.99,2026-08-17,DOWN,-0.31584736252172263,LIKELY_DECREASE,Likely to decrease
+Bawal Putih,model_signal,65.625,90.14084507042254,42,2026-08-17,UP,1.166000294025352,LIKELY_INCREASE,Likely to increase
+Cencaru,NO_STRONG_SIGNAL,NA,0,10,2026-08-17,NO_SIGNAL,NA,NO_STRONG_SIGNAL,No strong directional signal
+Demuduk / Cupak / Cermin,model_signal,59.375,45.714285714285715,32,2026-08-17,UP,0.5493301249635252,LIKELY_INCREASE,Likely to increase
+Ikan Merah,model_signal,62.06896551724138,43.28358208955223,53.495000000000005,2026-08-17,NO_SIGNAL,-0.10478947811869688,NO_STRONG_SIGNAL,No strong directional signal
+Jenahak,NO_STRONG_SIGNAL,NA,0,45.99,2026-08-17,NO_SIGNAL,NA,NO_STRONG_SIGNAL,No strong directional signal
+Kembung / Pelaling,NO_STRONG_SIGNAL,NA,0,15.9,2026-08-17,NO_SIGNAL,NA,NO_STRONG_SIGNAL,No strong directional signal
+Kerisi,model_signal,60.71428571428571,39.436619718309856,16.99,2026-08-17,NO_SIGNAL,-0.040179849720392014,NO_STRONG_SIGNAL,No strong directional signal
+Pelata,NO_STRONG_SIGNAL,NA,0,19.9,2026-08-17,NO_SIGNAL,NA,NO_STRONG_SIGNAL,No strong directional signal
+Selar Kuning,NO_STRONG_SIGNAL,NA,0,13.395,2026-08-17,NO_SIGNAL,NA,NO_STRONG_SIGNAL,No strong directional signal
+Siakap Putih,NO_STRONG_SIGNAL,NA,0,20,2026-08-17,NO_SIGNAL,NA,NO_STRONG_SIGNAL,No strong directional signal
+Tenggiri,NO_STRONG_SIGNAL,NA,0,49.99,2026-08-17,NO_SIGNAL,NA,NO_STRONG_SIGNAL,No strong directional signal

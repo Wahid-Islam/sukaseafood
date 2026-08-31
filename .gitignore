@@ -54,6 +54,10 @@ ui-debug.log
 # Postgres
 backend/db/dump/*.sql
 
+# Cloud SQL Auth Proxy binary — a ~30 MB Google-signed release, fetched per
+# machine rather than vendored. See docs/architecture/firebase-cloud-sql.md.
+tools/cloud-sql-proxy*
+
 # Leftover / local
 mobile/
 _pdf_preview/

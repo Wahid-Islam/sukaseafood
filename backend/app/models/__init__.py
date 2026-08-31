@@ -2,7 +2,7 @@
 
 These models MIRROR `backend/db/schema/v3_initial_schema.sql` and the indexes
 in `backend/db/schema/v3_functions_indexes.sql`; they do not define them. The
-SQL files are the source of truth (they are what gets applied to Supabase and
+SQL files are the source of truth (they are what gets applied to Cloud SQL and
 what the handoff document specifies), and Alembic executes those files
 verbatim. Keeping the ORM as a mirror means:
 
@@ -549,7 +549,13 @@ class PriceTrendPoint(Base):
 
 
 class ForecastModelVersion(Base):
-    """A trained price-forecast model version with validation metrics."""
+    """A trained price-forecast model version with validation metrics.
+
+    For the deployed engine `algorithm` is MODEL_SELECTION_V1 — a selection
+    POLICY, not one estimator. Which estimator won for a given fish is recorded
+    on the individual forecast row as `PriceForecast.model_used`, because the
+    walk-forward comparison is run per series.
+    """
 
     __tablename__ = "forecast_model_version"
     __table_args__ = (
@@ -563,6 +569,7 @@ class ForecastModelVersion(Base):
     forecast_model_version_id: Mapped[uuid.UUID] = _uuid_pk()
     version_name: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     algorithm: Mapped[str] = mapped_column(Text, nullable=False)
+    target_definition: Mapped[str | None] = mapped_column(Text, nullable=True)
     training_window_start: Mapped[date | None] = mapped_column(Date, nullable=True)
     training_window_end: Mapped[date | None] = mapped_column(Date, nullable=True)
     validation_mae: Mapped[Decimal | None] = mapped_column(Numeric(12, 4), nullable=True)
@@ -577,7 +584,19 @@ class ForecastModelVersion(Base):
 
 
 class PriceForecast(Base):
-    """Model-generated price outlook — separate from observed PriceCatcher data."""
+    """Model-generated price outlook — separate from observed PriceCatcher data.
+
+    Mirrors v3_initial_schema.sql plus the additive columns in
+    v3_forecast_contract.sql (Step 33B).
+
+    `outlook` and `range_outlook` are two different readings and are stored
+    separately on purpose. `outlook` is the directional verdict, emitted only
+    when validated evidence clears an RM0.25 movement threshold;
+    NO_STRONG_SIGNAL means the evidence did not justify claiming a move, which
+    is not the same as predicting stability. `range_outlook` says where the
+    forecast band sits against the reference price. Most production fish carry
+    NO_STRONG_SIGNAL, and the UI must present that as a real answer.
+    """
 
     __tablename__ = "price_forecast"
     __table_args__ = (
@@ -590,6 +609,29 @@ class PriceForecast(Base):
         CheckConstraint(
             "lower_bound <= expected_price AND expected_price <= upper_bound",
             name="price_forecast_bounds_check",
+        ),
+        CheckConstraint(
+            "outlook IS NULL OR outlook IN "
+            "('LIKELY_INCREASE', 'LIKELY_DECREASE', 'NO_STRONG_SIGNAL')",
+            name="price_forecast_outlook_check",
+        ),
+        CheckConstraint(
+            "quality_status IS NULL OR quality_status IN ('VALID', 'SPARSE_DATA')",
+            name="price_forecast_quality_status_check",
+        ),
+        CheckConstraint(
+            "horizon_weeks IS NULL OR horizon_weeks > 0",
+            name="price_forecast_horizon_weeks_check",
+        ),
+        CheckConstraint(
+            "current_reference_price IS NULL OR current_reference_price > 0",
+            name="price_forecast_reference_price_check",
+        ),
+        Index(
+            "idx_price_forecast_item_location_week",
+            "seafood_item_id",
+            "location_id",
+            "forecast_week_start",
         ),
     )
 
@@ -605,11 +647,25 @@ class PriceForecast(Base):
         ForeignKey("forecast_model_version.forecast_model_version_id"),
         nullable=False,
     )
+    # Nullable because the column was added to a table that already existed.
+    # The ingester always sets it; a forecast with no traceable snapshot is a
+    # number nobody can audit.
+    source_snapshot_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("source_snapshot.source_snapshot_id"), nullable=True
+    )
+    forecast_origin_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     forecast_week_start: Mapped[date] = mapped_column(Date, nullable=False)
+    horizon_weeks: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    current_reference_price: Mapped[Decimal | None] = mapped_column(
+        Numeric(12, 2), nullable=True
+    )
     expected_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     lower_bound: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     upper_bound: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     outlook: Mapped[str | None] = mapped_column(Text, nullable=True)
+    range_outlook: Mapped[str | None] = mapped_column(Text, nullable=True)
+    quality_status: Mapped[str | None] = mapped_column(Text, nullable=True)
+    model_used: Mapped[str | None] = mapped_column(Text, nullable=True)
     generated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
@@ -617,6 +673,7 @@ class PriceForecast(Base):
     seafood: Mapped[SeafoodItem] = relationship()
     location: Mapped[Location] = relationship()
     forecast_model_version: Mapped[ForecastModelVersion] = relationship()
+    snapshot: Mapped[SourceSnapshot | None] = relationship()
 
 
 # =============================================================================

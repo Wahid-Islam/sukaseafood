@@ -1,0 +1,13 @@
+canonical_name,model_to_use,quality_status,data_density,completed_week,reference_price,reference_active_days,reference_observation_count
+Bawal Hitam,"ETS(A,N,N)",SPARSE_DATA,SPARSE,2026-08-17,28.99,1,40
+Bawal Putih,"ETS(A,N,N)",VALID,DENSE,2026-08-17,42,7,91
+Cencaru,NAIVE,VALID,DENSE,2026-08-17,10,7,529
+Demuduk / Cupak / Cermin,"ETS(A,N,N)",VALID,DENSE,2026-08-17,32,7,174
+Ikan Merah,"ETS(A,N,N)",SPARSE_DATA,SPARSE,2026-08-17,53.495000000000005,1,50
+Jenahak,NAIVE,SPARSE_DATA,SPARSE,2026-08-17,45.99,1,57
+Kembung / Pelaling,NAIVE,VALID,DENSE,2026-08-17,15.9,7,483
+Kerisi,"ETS(A,N,N)",VALID,DENSE,2026-08-17,16.99,7,475
+Pelata,NAIVE,VALID,DENSE,2026-08-17,19.9,7,516
+Selar Kuning,NAIVE,VALID,DENSE,2026-08-17,13.395,7,309
+Siakap Putih,NAIVE,SPARSE_DATA,SPARSE,2026-08-17,20,1,36
+Tenggiri,NAIVE,SPARSE_DATA,SPARSE,2026-08-17,49.99,1,43

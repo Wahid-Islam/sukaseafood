@@ -192,9 +192,13 @@ DECLARE
   n_items INT;
   n_cv    INT;
 BEGIN
+  -- A floor, not an equality. Later seeds add canonical rows for species the
+  -- scanner cannot see but other subsystems need (08 adds the two forecast-only
+  -- fish), and on a re-run this guard would otherwise fail against the rows a
+  -- later file legitimately inserted.
   SELECT count(*) INTO n_items FROM seafood_item WHERE active;
-  IF n_items <> 12 THEN
-    RAISE EXCEPTION 'expected 12 active seafood_item rows after expansion, found %', n_items;
+  IF n_items < 12 THEN
+    RAISE EXCEPTION 'expected at least 12 active seafood_item rows after expansion, found %', n_items;
   END IF;
 
   SELECT count(*) INTO n_cv FROM seafood_item WHERE supports_cv;

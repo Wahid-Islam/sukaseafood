@@ -3,12 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../data/api/api_client.dart';
 import '../../data/mock/mock_catalog.dart';
+import '../../data/models/price_forecast.dart' as api;
 import '../../shared/widgets/ui_kit.dart';
+import 'forecast_card.dart';
 
 class PriceScreen extends StatefulWidget {
   const PriceScreen({super.key, required this.seafoodId});
 
+  /// Either a prototype slug or a canonical backend code (`SF001`).
   final String seafoodId;
 
   @override
@@ -16,11 +20,59 @@ class PriceScreen extends StatefulWidget {
 }
 
 class _PriceScreenState extends State<PriceScreen> {
+  final ApiClient _api = ApiClient();
+
   int _tab = 0;
+  bool _loadingForecast = true;
+  api.PriceForecast? _forecast;
+  ApiException? _forecastError;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadForecast();
+  }
+
+  @override
+  void dispose() {
+    _api.close();
+    super.dispose();
+  }
+
+  /// The observed-price content is prototype data, so a forecast failure must
+  /// not take the screen down with it — the card reports its own state.
+  Future<void> _loadForecast() async {
+    try {
+      final api.PriceForecast forecast =
+          await _api.forecast(MockCatalog.apiFishId(widget.seafoodId));
+      if (!mounted) return;
+      setState(() {
+        _forecast = forecast;
+        _loadingForecast = false;
+      });
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _forecastError = error;
+        _loadingForecast = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final SeafoodItem item = MockCatalog.byId(widget.seafoodId);
+    final SeafoodItem? prototype = MockCatalog.tryById(widget.seafoodId);
+    if (prototype == null) {
+      // A canonical species with no prototype content — a scan can reach one.
+      // The forecast is live data and stands on its own.
+      return _ForecastOnlyScaffold(
+        fishId: widget.seafoodId,
+        forecast: _forecast,
+        error: _forecastError,
+        loading: _loadingForecast,
+      );
+    }
+    final SeafoodItem item = prototype;
     final List<PricePoint> history = MockCatalog.historyFor(item);
 
     return Scaffold(
@@ -275,36 +327,10 @@ class _PriceScreenState extends State<PriceScreen> {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  SoftCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Price Outlook (Next 4 weeks)',
-                          style: TextStyle(fontWeight: FontWeight.w800),
-                        ),
-                        const SizedBox(height: 8),
-                        const Row(
-                          children: [
-                            Icon(Icons.trending_down, color: AppColors.good),
-                            SizedBox(width: 8),
-                            Text(
-                              'Likely to decrease',
-                              style: TextStyle(fontWeight: FontWeight.w800),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Prototype outlook card — ML forecasting will live on the backend later.',
-                        ),
-                        const SizedBox(height: 10),
-                        const Text(
-                          'Model confidence: High (82%)',
-                          style: TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                      ],
-                    ),
+                  ForecastCard(
+                    forecast: _forecast,
+                    error: _forecastError,
+                    loading: _loadingForecast,
                   ),
                   const SizedBox(height: 14),
                   const SoftCard(
@@ -312,13 +338,10 @@ class _PriceScreenState extends State<PriceScreen> {
                       children: [
                         Expanded(
                           child: Text(
-                            'Sources: PriceCatcher · Department of Fisheries Malaysia',
+                            'Sources: PriceCatcher · Department of Fisheries Malaysia '
+                            '· SukaSeafood forecast engine',
                             style: TextStyle(fontSize: 12),
                           ),
-                        ),
-                        Text(
-                          'Updated demo',
-                          style: TextStyle(fontSize: 12, color: AppColors.muted),
                         ),
                       ],
                     ),
@@ -327,6 +350,76 @@ class _PriceScreenState extends State<PriceScreen> {
                 ],
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Price view for a canonical species with no prototype content.
+///
+/// Reachable by scanning any of the species the prototype catalogue does not
+/// cover. Showing the live forecast alone is the honest option: fabricating
+/// observed-price history so the layout matches the other screens would put
+/// invented numbers next to real model output.
+class _ForecastOnlyScaffold extends StatelessWidget {
+  const _ForecastOnlyScaffold({
+    required this.fishId,
+    required this.forecast,
+    required this.error,
+    required this.loading,
+  });
+
+  final String fishId;
+  final api.PriceForecast? forecast;
+  final ApiException? error;
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) {
+    final String title = forecast?.canonicalName ?? fishId;
+
+    return Scaffold(
+      backgroundColor: AppColors.foam,
+      appBar: AppBar(
+        title: const Text('Price outlook'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.pop(),
+        ),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+        children: [
+          SoftCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w800, fontSize: 20),
+                ),
+                if (forecast != null && forecast!.displayName.isNotEmpty)
+                  Text(
+                    forecast!.displayName,
+                    style: const TextStyle(color: AppColors.muted),
+                  ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Observed price history is not available in this build for '
+                  'this species. The forecast below is live model output.',
+                  style: TextStyle(fontSize: 12, color: AppColors.muted),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          ForecastCard(
+            forecast: forecast,
+            error: error,
+            loading: loading,
           ),
         ],
       ),

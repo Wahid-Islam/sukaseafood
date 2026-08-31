@@ -16,7 +16,23 @@
 
 BEGIN;
 
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+-- Managed PostgreSQL (Cloud SQL) withholds CREATE on the database from ordinary
+-- roles, so an unconditional CREATE EXTENSION aborts the whole apply. Both
+-- extensions are optional: gen_random_uuid() is core since PostgreSQL 13, and
+-- suka_uuid5() in v3_functions_indexes.sql accepts either uuid-ossp or pgcrypto.
+DO $$
+BEGIN
+  CREATE EXTENSION IF NOT EXISTS pgcrypto;
+EXCEPTION WHEN insufficient_privilege THEN
+  RAISE NOTICE 'pgcrypto not installable by %; continuing without it.', current_user;
+END $$;
+
+DO $$
+BEGIN
+  CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+EXCEPTION WHEN insufficient_privilege THEN
+  RAISE NOTICE 'uuid-ossp not installable by %; continuing without it.', current_user;
+END $$;
 
 SET search_path TO public;
 

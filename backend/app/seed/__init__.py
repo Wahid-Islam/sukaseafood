@@ -3,7 +3,7 @@
 The seed itself lives in backend/db/seed/*.sql, not in Python dictionaries. One
 definition of the reference data, usable three ways:
 
-    backend/db/apply.sh          shell / CI / Supabase
+    backend/db/apply.sh          shell / CI / Cloud SQL
     docker-entrypoint-initdb.d   automatic on a fresh Docker volume
     apply_seed()                 tests and one-off local resets
 
@@ -42,12 +42,14 @@ async def _execute_file(engine: AsyncEngine, path: Path) -> None:
 
 
 async def apply_schema(engine: AsyncEngine | None = None) -> None:
-    """Create the V3 tables, enums, functions, indexes and app_user. Idempotent."""
+    """Create the V3 tables, enums, functions, indexes, forecast columns and
+    app_user. Idempotent."""
     engine = engine or default_engine
     for name in (
         "v3_initial_schema.sql",
         "v3_migrate_from_i1.sql",
         "v3_functions_indexes.sql",
+        "v3_forecast_contract.sql",
         "i1_app_user.sql",
     ):
         path = SCHEMA_DIR / name

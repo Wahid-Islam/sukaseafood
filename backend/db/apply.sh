@@ -28,6 +28,7 @@ echo "Target: $(printf '%s' "$DB" | sed -E 's#://[^@]*@#://***@#')"
 run "$DIR/schema/v3_initial_schema.sql"
 run "$DIR/schema/v3_migrate_from_i1.sql"
 run "$DIR/schema/v3_functions_indexes.sql"
+run "$DIR/schema/v3_forecast_contract.sql"
 run "$DIR/schema/i1_app_user.sql"
 
 if [ "$SCHEMA_ONLY" -eq 0 ]; then
