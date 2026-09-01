@@ -413,3 +413,69 @@ def test_sources_listed(client):
     res = client.get("/api/v1/sources")
     assert res.status_code == 200
     assert len(res.json()) >= 4
+
+
+def test_search_finds_bawal_putih(client):
+    """SF006 must be searchable by its Malay market name (QA T08)."""
+    results = client.get("/api/v1/search", params={"q": "Bawal Putih"}).json()["results"]
+    assert any(r["fish_id"] == "SF006" for r in results)
+
+
+def test_catalogue_image_urls_are_not_storage_404s(client):
+    """Every species must carry a real photo URL, not a Firebase path that 404s."""
+    items = client.get("/api/v1/seafood").json()
+    assert len(items) == 14
+    for item in items:
+        url = item["image_url"]
+        assert url, item["fish_id"]
+        assert "firebasestorage.googleapis.com" not in url, item["fish_id"]
+
+
+def test_forecast_rejects_malformed_location_id(client):
+    """A non-UUID location_id is 400 at the boundary, not a 16s 500 (QA T14)."""
+    res = client.get(
+        "/api/v1/seafood/SF012/forecast",
+        params={"location_id": "not-a-uuid"},
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"]["error"]["code"] == "INVALID_LOCATION"
+
+
+def test_forecast_rejects_unknown_uuid_location(client):
+    res = client.get(
+        "/api/v1/seafood/SF012/forecast",
+        params={"location_id": str(uuid.uuid4())},
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"]["error"]["code"] == "INVALID_LOCATION"
+
+
+def test_fresh_account_has_empty_favourites(client):
+    """A new user must not inherit a static four-item list (QA T20)."""
+    email = f"qa-{uuid.uuid4().hex[:10]}@example.com"
+    signup = client.post(
+        "/api/v1/auth/signup",
+        json={"name": "QA User", "email": email, "password": "secret12"},
+    )
+    assert signup.status_code == 201, signup.text
+    body = signup.json()
+    assert body["user"]["forecast_location_name"] == "Selangor"
+    token = body["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    listed = client.get("/api/v1/me/favourites", headers=headers)
+    assert listed.status_code == 200
+    assert listed.json() == []
+
+    added = client.post(
+        "/api/v1/me/favourites",
+        headers=headers,
+        json={"fish_id": "SF006"},
+    )
+    assert added.status_code == 201
+    assert added.json()["fish_id"] == "SF006"
+    assert client.get("/api/v1/me/favourites", headers=headers).json()[0]["fish_id"] == "SF006"
+
+    removed = client.delete("/api/v1/me/favourites/SF006", headers=headers)
+    assert removed.status_code == 204
+    assert client.get("/api/v1/me/favourites", headers=headers).json() == []

@@ -1,26 +1,89 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/theme/app_theme.dart';
-import '../../data/mock/mock_catalog.dart';
+import '../../data/catalog/catalog_controller.dart';
+import '../../data/catalog/fish_ids.dart';
+import '../../data/models/seafood.dart';
 import '../../shared/widgets/ui_kit.dart';
 
-class SeafoodDetailScreen extends StatelessWidget {
+class SeafoodDetailScreen extends StatefulWidget {
   const SeafoodDetailScreen({super.key, required this.seafoodId});
 
   final String seafoodId;
 
   @override
-  Widget build(BuildContext context) {
-    final SeafoodItem? prototype = MockCatalog.tryById(seafoodId);
-    if (prototype == null) {
-      // A confirmed scan can land on any of the fourteen canonical species,
-      // and the prototype catalogue covers seven. Sustainability and cooking
-      // copy for the rest is not in this build; the live price outlook is.
-      return _ProfileUnavailable(fishId: seafoodId);
+  State<SeafoodDetailScreen> createState() => _SeafoodDetailScreenState();
+}
+
+class _SeafoodDetailScreenState extends State<SeafoodDetailScreen> {
+  late final String _fishId = FishIds.canonical(widget.seafoodId);
+  SeafoodProfile? _profile;
+  PriceContext? _price;
+  Object? _error;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final CatalogController catalog = context.read<CatalogController>();
+    try {
+      final SeafoodProfile profile = await catalog.profile(_fishId);
+      PriceContext? price;
+      try {
+        price = await catalog.price(_fishId);
+      } catch (_) {
+        price = null;
+      }
+      if (!mounted) return;
+      setState(() {
+        _profile = profile;
+        _price = price;
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error;
+        _loading = false;
+      });
     }
-    final SeafoodItem item = prototype;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_error != null || _profile == null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Species'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => context.pop(),
+          ),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(_error?.toString() ?? 'Species not found.'),
+          ),
+        ),
+      );
+    }
+
+    final SeafoodProfile item = _profile!;
     final Color tone = AppTheme.classificationColor(item.classification);
+    final bool saved = context.watch<CatalogController>().isFavourite(item.fishId);
+    final bool priced = _price?.isDisplayable == true;
 
     return Scaffold(
       backgroundColor: AppColors.foam,
@@ -34,22 +97,23 @@ class SeafoodDetailScreen extends StatelessWidget {
               icon: const Icon(Icons.arrow_back),
               onPressed: () => context.pop(),
             ),
-            actions: const [
-              Icon(Icons.favorite_border, color: Colors.white),
-              SizedBox(width: 8),
-              Icon(Icons.ios_share, color: Colors.white),
-              SizedBox(width: 12),
+            actions: [
+              IconButton(
+                tooltip: saved ? 'Remove favourite' : 'Save favourite',
+                onPressed: () =>
+                    context.read<CatalogController>().toggleFavourite(item.fishId),
+                icon: Icon(
+                  saved ? Icons.favorite : Icons.favorite_border,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(width: 8),
             ],
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.network(
-                    item.imageUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
-                        const ColoredBox(color: AppColors.navy),
-                  ),
+                  NetworkFishImage(url: item.imageUrl, borderRadius: 0),
                   DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
@@ -70,7 +134,7 @@ class SeafoodDetailScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          item.commonName,
+                          item.shortName,
                           style: Theme.of(context).textTheme.displayLarge?.copyWith(
                                 fontSize: 36,
                               ),
@@ -84,31 +148,22 @@ class SeafoodDetailScreen extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            const Icon(Icons.photo_camera_outlined,
-                                size: 14, color: Colors.white70),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Also known as: ${item.alsoKnownAs}',
-                              style: const TextStyle(color: Colors.white70),
-                            ),
-                          ],
-                        ),
+                        if (item.alsoKnownAs.isNotEmpty)
+                          Text(
+                            'Also known as: ${item.alsoKnownAs}',
+                            style: const TextStyle(color: Colors.white70),
+                          ),
                         const SizedBox(height: 6),
                         Text(
                           item.about,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.9),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  const Positioned(
-                    right: 16,
-                    bottom: 16,
-                    child: Text('1/5', style: TextStyle(color: Colors.white70)),
                   ),
                 ],
               ),
@@ -161,30 +216,25 @@ class SeafoodDetailScreen extends StatelessWidget {
                                 ],
                               ),
                               const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Icon(Icons.check_circle, color: tone),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    item.classification,
-                                    style: TextStyle(
-                                      color: tone,
-                                      fontWeight: FontWeight.w900,
-                                      fontSize: 18,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                              ClassificationPill(label: item.classification),
                               const SizedBox(height: 6),
-                              Text(item.classificationBlurb),
-                              const SizedBox(height: 10),
-                              const Text(
-                                'About WWF ratings',
-                                style: TextStyle(
-                                  color: AppColors.tealDark,
-                                  fontWeight: FontWeight.w700,
-                                ),
+                              Text(
+                                item.sustainability?.explanation ??
+                                    'No WWF assessment is on file for this species.',
                               ),
+                              if (item.sustainability != null) ...[
+                                const SizedBox(height: 8),
+                                Text(
+                                  item.sustainability!.verified
+                                      ? 'Verified from ${item.sustainability!.sourceName}'
+                                      : 'Not verified — UNDETERMINED is the honest state, not a rating.',
+                                  style: const TextStyle(
+                                    color: AppColors.tealDark,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),
@@ -201,36 +251,9 @@ class SeafoodDetailScreen extends StatelessWidget {
                   const SizedBox(height: 14),
                   SoftCard(
                     color: AppColors.goodSoft,
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 42,
-                          height: 42,
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(Icons.eco, color: tone),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Why this is a good choice for you',
-                                style: TextStyle(
-                                  color: tone,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(item.whyGood.join(' · ')),
-                            ],
-                          ),
-                        ),
-                        const Icon(Icons.chevron_right),
-                      ],
+                    child: Text(
+                      item.sustainability?.whyItMatters ??
+                          'We would rather show UNDETERMINED than invent a rating.',
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -238,45 +261,40 @@ class SeafoodDetailScreen extends StatelessWidget {
                     children: [
                       Expanded(
                         child: SoftCard(
-                          onTap: () => context.push('/price/${item.id}'),
+                          onTap: () => context.push('/price/${item.fishId}'),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Row(
-                                children: [
-                                  Icon(Icons.circle, size: 8, color: AppColors.good),
-                                  SizedBox(width: 6),
-                                  Text(
-                                    'LIVE DATA',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppColors.good,
-                                    ),
-                                  ),
-                                ],
+                              const Text(
+                                'LIVE DATA',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.good,
+                                ),
                               ),
                               const SizedBox(height: 8),
-                              const Row(
-                                children: [
-                                  Text(
-                                    'Check Price',
-                                    style: TextStyle(fontWeight: FontWeight.w800),
-                                  ),
-                                  Icon(Icons.north_east, size: 14, color: AppColors.tealDark),
-                                ],
+                              const Text(
+                                'Check Price',
+                                style: TextStyle(fontWeight: FontWeight.w800),
                               ),
                               const SizedBox(height: 10),
                               const Icon(Icons.show_chart, color: AppColors.good, size: 36),
                               const SizedBox(height: 8),
-                              Text(
-                                'RM ${item.priceRm.toStringAsFixed(2)}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 20,
+                              if (priced)
+                                Text(
+                                  'RM ${_price!.latestPriceRmPerKg!.toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 20,
+                                  ),
+                                )
+                              else
+                                Text(
+                                  _price?.status ?? 'Outlook',
+                                  style: const TextStyle(fontSize: 13),
                                 ),
-                              ),
-                              const Text('Latest price / kg'),
+                              const Text('Observed / kg'),
                             ],
                           ),
                         ),
@@ -284,51 +302,35 @@ class SeafoodDetailScreen extends StatelessWidget {
                       const SizedBox(width: 12),
                       Expanded(
                         child: SoftCard(
-                          onTap: () => context.push('/cooking/${item.id}'),
+                          onTap: () => context.push('/cooking/${item.fishId}'),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Row(
-                                children: [
-                                  Icon(Icons.restaurant, size: 14, color: Color(0xFF7B61FF)),
-                                  SizedBox(width: 6),
-                                  Text(
-                                    'COOKING',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w800,
-                                      color: Color(0xFF7B61FF),
-                                    ),
-                                  ),
-                                ],
+                              const Text(
+                                'COOKING',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF7B61FF),
+                                ),
                               ),
                               const SizedBox(height: 8),
-                              const Row(
-                                children: [
-                                  Text(
-                                    'Find Cooking Options',
-                                    style: TextStyle(fontWeight: FontWeight.w800),
-                                  ),
-                                  Icon(Icons.north_east, size: 14, color: Color(0xFF7B61FF)),
-                                ],
+                              const Text(
+                                'Find Cooking Options',
+                                style: TextStyle(fontWeight: FontWeight.w800),
                               ),
                               const SizedBox(height: 10),
                               NetworkFishImage(
-                                url: MockCatalog.grilled,
+                                url: item.imageUrl,
                                 height: 52,
                                 borderRadius: 10,
                               ),
                               const SizedBox(height: 8),
-                              const Row(
-                                children: [
-                                  Icon(Icons.star, color: AppColors.star, size: 16),
-                                  Icon(Icons.star, color: AppColors.star, size: 16),
-                                  Icon(Icons.star, color: AppColors.star, size: 16),
-                                  Icon(Icons.star, color: AppColors.star, size: 16),
-                                  Icon(Icons.star, color: AppColors.star, size: 16),
-                                ],
+                              Text(
+                                item.cooking.isEmpty
+                                    ? 'No method scores yet'
+                                    : '${item.cooking.first.method} · ${item.cooking.first.starsOutOfFive}/5',
                               ),
-                              const Text('Top rating match'),
                             ],
                           ),
                         ),
@@ -370,69 +372,6 @@ class _Fact extends StatelessWidget {
             value,
             textAlign: TextAlign.center,
             style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Landing state for a canonical species this build has no profile content for.
-///
-/// Deliberately sparse. A confident-looking profile assembled from defaults
-/// would be worse than an empty one: sustainability advice is the whole point
-/// of the screen, and inventing it for an unsourced species would mislead
-/// exactly the decision the app exists to inform.
-class _ProfileUnavailable extends StatelessWidget {
-  const _ProfileUnavailable({required this.fishId});
-
-  final String fishId;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.foam,
-      appBar: AppBar(
-        title: const Text('Species confirmed'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
-        children: [
-          SoftCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  fishId,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w800, fontSize: 20),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Sustainability and cooking guidance for this species is not '
-                  'in this build yet. We would rather show nothing than guess a '
-                  'rating.',
-                  style: TextStyle(color: AppColors.muted),
-                ),
-                const SizedBox(height: 14),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.navy,
-                      foregroundColor: Colors.white,
-                    ),
-                    onPressed: () => context.push('/price/$fishId'),
-                    icon: const Icon(Icons.show_chart),
-                    label: const Text('See price outlook'),
-                  ),
-                ),
-              ],
-            ),
           ),
         ],
       ),

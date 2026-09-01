@@ -14,6 +14,7 @@ EXPECTED_TABLES = {
     "forecast_model_version", "price_forecast", "supply_landing_point",
     "cooking_method", "cooking_suitability", "cv_model_version", "cv_class_mapping",
     "recipe", "recipe_seafood_mapping", "recipe_cooking_method", "app_user",
+    "user_favourite",
 }
 
 EXPECTED_ENUMS = {

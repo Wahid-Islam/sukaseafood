@@ -5,12 +5,16 @@ class UserProfile {
     required this.name,
     required this.email,
     this.createdAt,
+    this.forecastLocationId,
+    this.forecastLocationName,
   });
 
   final String uid;
   final String name;
   final String email;
   final DateTime? createdAt;
+  final String? forecastLocationId;
+  final String? forecastLocationName;
 
   factory UserProfile.fromJson(Map<String, dynamic> data) {
     final Object? created = data['created_at'];
@@ -26,6 +30,8 @@ class UserProfile {
           : 'Friend',
       email: (data['email'] as String?) ?? '',
       createdAt: createdAt,
+      forecastLocationId: data['forecast_location_id'] as String?,
+      forecastLocationName: data['forecast_location_name'] as String?,
     );
   }
 }

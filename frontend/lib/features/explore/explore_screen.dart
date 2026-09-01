@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/theme/app_theme.dart';
-import '../../data/mock/mock_catalog.dart';
+import '../../data/catalog/catalog_controller.dart';
+import '../../data/models/seafood.dart';
 import '../../shared/widgets/ui_kit.dart';
 
 class ExploreScreen extends StatefulWidget {
@@ -14,18 +18,56 @@ class ExploreScreen extends StatefulWidget {
 
 class _ExploreScreenState extends State<ExploreScreen> {
   final TextEditingController _controller = TextEditingController();
-  List<String> _recent = List<String>.from(MockCatalog.recentSearches);
+  Timer? _debounce;
+  List<SeafoodSummary> _results = const <SeafoodSummary>[];
+  bool _searching = false;
+  String? _searchError;
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _controller.dispose();
     super.dispose();
   }
 
+  void _onQueryChanged(String value) {
+    _debounce?.cancel();
+    final String q = value.trim();
+    if (q.isEmpty) {
+      setState(() {
+        _results = const <SeafoodSummary>[];
+        _searching = false;
+        _searchError = null;
+      });
+      return;
+    }
+    setState(() => _searching = true);
+    _debounce = Timer(const Duration(milliseconds: 350), () async {
+      try {
+        final List<SeafoodSummary> found =
+            await context.read<CatalogController>().search(q);
+        if (!mounted) return;
+        setState(() {
+          _results = found;
+          _searching = false;
+          _searchError = null;
+        });
+      } catch (error) {
+        if (!mounted) return;
+        setState(() {
+          _results = const <SeafoodSummary>[];
+          _searching = false;
+          _searchError = error.toString();
+        });
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final List<SeafoodItem> popular = MockCatalog.items.take(4).toList();
-    final List<SeafoodItem> results = MockCatalog.search(_controller.text);
+    final CatalogController catalog = context.watch<CatalogController>();
+    final List<SeafoodSummary> popular = catalog.items.take(8).toList();
+    final bool showResults = _controller.text.trim().isNotEmpty;
 
     return Scaffold(
       backgroundColor: AppColors.navy,
@@ -38,11 +80,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
+                  const Row(
                     children: [
-                      const Icon(Icons.waves, color: AppColors.teal),
-                      const SizedBox(width: 8),
-                      const Expanded(
+                      Icon(Icons.waves, color: AppColors.teal),
+                      SizedBox(width: 8),
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -63,10 +105,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
                             ),
                           ],
                         ),
-                      ),
-                      IconButton(
-                        onPressed: () {},
-                        icon: const Icon(Icons.info_outline, color: Colors.white70),
                       ),
                     ],
                   ),
@@ -106,7 +144,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 children: [
                   TextField(
                     controller: _controller,
-                    onChanged: (_) => setState(() {}),
+                    onChanged: _onQueryChanged,
                     decoration: InputDecoration(
                       hintText: 'Search seafood by name',
                       filled: true,
@@ -151,62 +189,48 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       ],
                     ),
                   ),
-                  if (results.isNotEmpty) ...[
+                  if (showResults) ...[
                     const SizedBox(height: 18),
                     const Text(
                       'Results',
                       style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
                     ),
-                    ...results.map(
-                      (SeafoodItem item) => ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: SizedBox(
-                          width: 48,
-                          height: 48,
-                          child: NetworkFishImage(url: item.imageUrl, borderRadius: 10),
+                    if (_searching)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24),
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    else if (_searchError != null)
+                      SoftCard(child: Text(_searchError!))
+                    else if (_results.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        child: Text('No species matched that name in the live catalogue.'),
+                      )
+                    else
+                      ..._results.map(
+                        (SeafoodSummary item) => ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: SizedBox(
+                            width: 48,
+                            height: 48,
+                            child: NetworkFishImage(
+                              url: item.imageUrl,
+                              borderRadius: 10,
+                            ),
+                          ),
+                          title: Text(item.shortName),
+                          subtitle: Text(item.scientificName),
+                          trailing: ClassificationPill(
+                            label: item.classification ?? 'UNDETERMINED',
+                          ),
+                          onTap: () => context.push('/seafood/${item.fishId}'),
                         ),
-                        title: Text(item.commonName),
-                        subtitle: Text(item.scientificName),
-                        trailing: ClassificationPill(label: item.classification),
-                        onTap: () => context.push('/seafood/${item.id}'),
                       ),
-                    ),
                   ] else ...[
                     const SizedBox(height: 18),
-                    Row(
-                      children: [
-                        const Text(
-                          'Recent searches',
-                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-                        ),
-                        const Spacer(),
-                        TextButton(
-                          onPressed: () => setState(() => _recent = <String>[]),
-                          style: TextButton.styleFrom(foregroundColor: AppColors.avoid),
-                          child: const Text('Clear all'),
-                        ),
-                      ],
-                    ),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: _recent
-                          .map(
-                            (String name) => InputChip(
-                              avatar: const Icon(Icons.history, size: 16),
-                              label: Text(name),
-                              onDeleted: () => setState(() => _recent.remove(name)),
-                              onPressed: () {
-                                _controller.text = name;
-                                setState(() {});
-                              },
-                            ),
-                          )
-                          .toList(),
-                    ),
-                    const SizedBox(height: 18),
                     const Text(
-                      'Popular searches',
+                      'Catalogue',
                       style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
                     ),
                     const SizedBox(height: 10),
@@ -217,12 +241,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         itemCount: popular.length,
                         separatorBuilder: (_, __) => const SizedBox(width: 10),
                         itemBuilder: (context, index) {
-                          final SeafoodItem item = popular[index];
+                          final SeafoodSummary item = popular[index];
                           return SizedBox(
                             width: 100,
                             child: SoftCard(
                               padding: const EdgeInsets.all(8),
-                              onTap: () => context.push('/seafood/${item.id}'),
+                              onTap: () => context.push('/seafood/${item.fishId}'),
                               child: Column(
                                 children: [
                                   NetworkFishImage(
@@ -232,7 +256,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
-                                    item.commonName,
+                                    item.shortName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(fontWeight: FontWeight.w800),
                                   ),
                                 ],
@@ -244,7 +270,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     ),
                     const SizedBox(height: 16),
                     SoftCard(
-                      onTap: () => context.push('/seafood/kembung'),
+                      onTap: () => context.push('/seafood/SF001'),
                       child: const Row(
                         children: [
                           Icon(Icons.set_meal, color: AppColors.tealDark),
@@ -260,7 +286,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                     style: TextStyle(fontWeight: FontWeight.w800),
                                   ),
                                   TextSpan(
-                                    text: ' (Rastrelliger spp.)?',
+                                    text: ' (Rastrelliger kanagurta)?',
                                     style: TextStyle(fontStyle: FontStyle.italic),
                                   ),
                                 ],
@@ -269,23 +295,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
                           ),
                           Icon(Icons.chevron_right),
                         ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Search suggestions',
-                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-                    ),
-                    ...MockCatalog.suggestions.map(
-                      (String s) => ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.search, color: AppColors.muted),
-                        title: Text(s),
-                        trailing: const Icon(Icons.north_east, size: 16),
-                        onTap: () {
-                          _controller.text = s;
-                          setState(() {});
-                        },
                       ),
                     ),
                   ],

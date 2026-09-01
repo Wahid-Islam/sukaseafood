@@ -73,11 +73,16 @@ class ProfileScreen extends StatelessWidget {
                         subtitle: Text(email.isEmpty ? '—' : email),
                       ),
                       const Divider(),
-                      const ListTile(
+                      ListTile(
                         contentPadding: EdgeInsets.zero,
-                        leading: Icon(Icons.location_on_outlined),
-                        title: Text('Default location'),
-                        subtitle: Text('Kuala Lumpur'),
+                        leading: const Icon(Icons.location_on_outlined),
+                        title: const Text('Forecast location'),
+                        subtitle: Text(
+                          '${auth.forecastLocationName}\n'
+                          'Price outlooks use this state — the forecasting '
+                          'engine’s production scope. Other states are not modelled yet.',
+                        ),
+                        isThreeLine: true,
                       ),
                     ],
                   ),

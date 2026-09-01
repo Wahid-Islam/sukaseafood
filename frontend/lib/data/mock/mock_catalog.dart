@@ -1,3 +1,5 @@
+import '../catalog/fish_ids.dart';
+
 /// Domain models for UI (PocketBase collections later).
 class SeafoodItem {
   const SeafoodItem({
@@ -52,12 +54,18 @@ class PricePoint {
 class MockCatalog {
   MockCatalog._();
 
+  /// Photographs of the named species (Wikimedia Commons), not stock food.
+  static String _speciesPhoto(String fileName) {
+    return 'https://commons.wikimedia.org/wiki/Special:FilePath/'
+        '${Uri.encodeComponent(fileName)}?width=800';
+  }
+
   static const String heroBoat =
       'https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=1200&q=80';
-  static const String cookingDish =
-      'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&w=1200&q=80';
-  static const String grilled =
-      'https://images.unsplash.com/photo-1559339352-11d035aa65de?auto=format&fit=crop&w=800&q=80';
+  static final String cookingDish = _speciesPhoto(
+    'Yellowstripe Cads (Selaroides leptolepis) (8460533635).jpg',
+  );
+  static final String grilled = cookingDish;
 
   static final List<SeafoodItem> items = [
     SeafoodItem(
@@ -70,8 +78,9 @@ class MockCatalog {
       marketAvailability: 'Year-round',
       about:
           'A firm, flavourful mackerel popular across Malaysian markets and coastal kitchens.',
-      imageUrl:
-          'https://images.unsplash.com/photo-1534766555764-ce878a5e3a2b?auto=format&fit=crop&w=1000&q=80',
+      imageUrl: _speciesPhoto(
+        'Narrow-barred spanish mackerel (Scomberomorus commerson).jpg',
+      ),
       classification: 'GOOD CHOICE',
       classificationBlurb:
           'Tenggiri is a good choice for you and our oceans.',
@@ -98,8 +107,7 @@ class MockCatalog {
       marketAvailability: 'Year-round',
       about:
           'A versatile, mild-flavoured fish that shines in many dishes.',
-      imageUrl:
-          'https://images.unsplash.com/photo-1510130387422-82bed34b37e9?auto=format&fit=crop&w=1000&q=80',
+      imageUrl: _speciesPhoto('Atule mate palau.jpg'),
       classification: 'GOOD CHOICE',
       classificationBlurb: 'Selar is a good choice for you and our oceans.',
       whyGood: const [
@@ -123,8 +131,7 @@ class MockCatalog {
       commonIn: 'Malaysia',
       marketAvailability: 'Year-round',
       about: 'A classic wet-market favourite for goreng and gulai.',
-      imageUrl:
-          'https://images.unsplash.com/photo-1600699277512-846c1bfa8d2b?auto=format&fit=crop&w=1000&q=80',
+      imageUrl: _speciesPhoto('Rastrelliger_kanagurta_JNC2855.JPG'),
       classification: 'GOOD CHOICE',
       classificationBlurb: 'Kembung is a solid everyday sustainable pick.',
       whyGood: const [
@@ -148,8 +155,9 @@ class MockCatalog {
       commonIn: 'Malaysia',
       marketAvailability: 'Year-round',
       about: 'Premium steamed-fish favourite — choose carefully.',
-      imageUrl:
-          'https://images.unsplash.com/photo-1498654077810-12c21d47b6dd?auto=format&fit=crop&w=1000&q=80',
+      imageUrl: _speciesPhoto(
+        'Lutjanus_sebae_in_UShaka_Sea_World_0862a.jpg',
+      ),
       classification: 'AVOID',
       classificationBlurb:
           'Many snapper fisheries face pressure — prefer better-rated swaps.',
@@ -174,8 +182,9 @@ class MockCatalog {
       commonIn: 'Malaysia',
       marketAvailability: 'Year-round',
       about: 'Affordable farmed fish — look for responsible farms / MyGAP.',
-      imageUrl:
-          'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&w=1000&q=80',
+      imageUrl: _speciesPhoto(
+        'Tilápia_ou_Sarotherodon_niloticus_2.jpg',
+      ),
       classification: 'GOOD CHOICE',
       classificationBlurb: 'Responsibly farmed tilapia is a smart everyday choice.',
       whyGood: const [
@@ -199,8 +208,7 @@ class MockCatalog {
       commonIn: 'Malaysia',
       marketAvailability: 'Year-round',
       about: 'Strong flavour, great for sambal and gulai.',
-      imageUrl:
-          'https://images.unsplash.com/photo-1551244072-5d12893278ab?auto=format&fit=crop&w=1000&q=80',
+      imageUrl: _speciesPhoto('Euthynnus_affinis_Maldives.JPG'),
       classification: 'REDUCE',
       classificationBlurb: 'Enjoy tongkol less often while better options exist.',
       whyGood: const [
@@ -224,8 +232,7 @@ class MockCatalog {
       commonIn: 'Malaysia',
       marketAvailability: 'Year-round',
       about: 'Restaurant classic — steamed siakap with soy and ginger.',
-      imageUrl:
-          'https://images.unsplash.com/photo-1615141982883-c7adab2b8ae2?auto=format&fit=crop&w=1000&q=80',
+      imageUrl: _speciesPhoto('Lates_calcarifer,_2014-09-19a.jpg'),
       classification: 'GOOD CHOICE',
       classificationBlurb: 'Farmed siakap can be a responsible celebration dish.',
       whyGood: const [
@@ -264,19 +271,9 @@ class MockCatalog {
 
   /// Canonical backend code for API calls.
   ///
-  /// Home and Explore still navigate with prototype slugs (`tenggiri`).
-  /// `/seafood/{id}/forecast` only accepts `SF001`…`SF014` or a UUID, so a
-  /// slug has to be reversed here or the outlook 404s as a missing fish.
-  static String apiFishId(String id) {
-    final String trimmed = id.trim();
-    if (trimmed.toUpperCase().startsWith('SF')) {
-      return trimmed.toUpperCase();
-    }
-    for (final MapEntry<String, String> entry in _codeAliases.entries) {
-      if (entry.value == trimmed) return entry.key;
-    }
-    return trimmed;
-  }
+  /// Older routes still used prototype slugs (`tenggiri`). Forecast and
+  /// profile endpoints only accept `SF001`…`SF014` or a UUID.
+  static String apiFishId(String id) => FishIds.canonical(id);
 
   /// Resolve a slug or backend code, or null when there is no prototype entry.
   static SeafoodItem? tryById(String id) {

@@ -56,10 +56,26 @@ def _create_connector_engine() -> AsyncEngine:
             ip_type=IPTypes.PUBLIC,
         )
 
+    # NullPool is only for pytest (a fresh event loop per test). Production
+    # Cloud Run pays a Singapore→us-east4 handshake on every new connection;
+    # pooling that path is the difference between ~4.5s catalogue calls and a
+    # reused session. ConnectorLoopError is already avoided by creating the
+    # Connector lazily on the running loop above.
+    if settings.db_use_null_pool:
+        return create_async_engine(
+            "postgresql+asyncpg://",
+            async_creator=getconn,
+            poolclass=NullPool,
+            echo=settings.db_echo,
+        )
+
     return create_async_engine(
         "postgresql+asyncpg://",
         async_creator=getconn,
-        poolclass=NullPool,
+        pool_size=settings.db_pool_size,
+        max_overflow=settings.db_max_overflow,
+        pool_recycle=settings.db_pool_recycle_seconds,
+        pool_pre_ping=True,
         echo=settings.db_echo,
     )
 

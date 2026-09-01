@@ -4,23 +4,42 @@ import 'package:provider/provider.dart';
 import 'core/auth/auth_controller.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'data/catalog/catalog_controller.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final AuthController authController = AuthController();
   await authController.bootstrap();
-  runApp(SukaSeafoodApp(authController: authController));
+  final CatalogController catalogController =
+      CatalogController(auth: authController);
+  await catalogController.bootstrap();
+  runApp(
+    SukaSeafoodApp(
+      authController: authController,
+      catalogController: catalogController,
+    ),
+  );
 }
 
 class SukaSeafoodApp extends StatelessWidget {
-  const SukaSeafoodApp({super.key, required this.authController});
+  const SukaSeafoodApp({
+    super.key,
+    required this.authController,
+    this.catalogController,
+  });
 
   final AuthController authController;
+  final CatalogController? catalogController;
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider<AuthController>.value(
-      value: authController,
+    final CatalogController catalog =
+        catalogController ?? CatalogController.forTesting();
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider<AuthController>.value(value: authController),
+        ChangeNotifierProvider<CatalogController>.value(value: catalog),
+      ],
       child: MaterialApp.router(
         title: 'SukaSeafood',
         debugShowCheckedModeBanner: false,

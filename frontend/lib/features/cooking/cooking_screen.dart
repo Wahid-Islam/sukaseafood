@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/theme/app_theme.dart';
-import '../../data/mock/mock_catalog.dart';
+import '../../data/catalog/catalog_controller.dart';
+import '../../data/catalog/fish_ids.dart';
+import '../../data/models/seafood.dart';
 import '../../shared/widgets/ui_kit.dart';
 
 class CookingScreen extends StatefulWidget {
@@ -15,13 +18,76 @@ class CookingScreen extends StatefulWidget {
 }
 
 class _CookingScreenState extends State<CookingScreen> {
-  String _method = 'grilling';
+  late final String _fishId = FishIds.canonical(widget.seafoodId);
+  SeafoodProfile? _profile;
+  PriceContext? _price;
+  Object? _error;
+  bool _loading = true;
+  String? _method;
   int _people = 2;
 
   @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final CatalogController catalog = context.read<CatalogController>();
+    try {
+      final SeafoodProfile profile = await catalog.profile(_fishId);
+      PriceContext? price;
+      try {
+        price = await catalog.price(_fishId);
+      } catch (_) {
+        price = null;
+      }
+      if (!mounted) return;
+      setState(() {
+        _profile = profile;
+        _price = price;
+        _method = profile.cooking.isEmpty ? null : profile.cooking.first.method;
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error;
+        _loading = false;
+      });
+    }
+  }
+
+  CookingSuitability? get _selected {
+    final String? method = _method;
+    if (method == null || _profile == null) return null;
+    for (final CookingSuitability row in _profile!.cooking) {
+      if (row.method == method) return row;
+    }
+    return null;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final SeafoodItem item = MockCatalog.byId(widget.seafoodId);
-    final bool best = item.cookingMethods.contains(_method);
+    if (_loading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (_error != null || _profile == null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Cooking'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => context.pop(),
+          ),
+        ),
+        body: Center(child: Text(_error?.toString() ?? 'Species not found.')),
+      );
+    }
+
+    final SeafoodProfile item = _profile!;
+    final CookingSuitability? selected = _selected;
+    final bool priced = _price?.isDisplayable == true;
 
     return Scaffold(
       backgroundColor: AppColors.foam,
@@ -35,22 +101,11 @@ class _CookingScreenState extends State<CookingScreen> {
               icon: const Icon(Icons.arrow_back),
               onPressed: () => context.pop(),
             ),
-            actions: const [
-              Icon(Icons.favorite_border, color: Colors.white),
-              SizedBox(width: 8),
-              Icon(Icons.ios_share, color: Colors.white),
-              SizedBox(width: 12),
-            ],
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.network(
-                    item.imageUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
-                        const ColoredBox(color: AppColors.navy),
-                  ),
+                  NetworkFishImage(url: item.imageUrl, borderRadius: 0),
                   DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
@@ -71,7 +126,7 @@ class _CookingScreenState extends State<CookingScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          item.commonName,
+                          item.shortName,
                           style: Theme.of(context)
                               .textTheme
                               .displayLarge
@@ -84,17 +139,11 @@ class _CookingScreenState extends State<CookingScreen> {
                             fontStyle: FontStyle.italic,
                           ),
                         ),
-                        Text(
-                          'Also known as: ${item.alsoKnownAs}',
-                          style: const TextStyle(color: Colors.white70),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          item.about,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.9),
+                        if (item.alsoKnownAs.isNotEmpty)
+                          Text(
+                            'Also known as: ${item.alsoKnownAs}',
+                            style: const TextStyle(color: Colors.white70),
                           ),
-                        ),
                       ],
                     ),
                   ),
@@ -113,10 +162,7 @@ class _CookingScreenState extends State<CookingScreen> {
                       children: [
                         _MiniFact(label: 'Type', value: item.fishType),
                         _MiniFact(label: 'Common in', value: item.commonIn),
-                        _MiniFact(
-                          label: 'Market',
-                          value: item.marketAvailability,
-                        ),
+                        _MiniFact(label: 'Market', value: item.marketAvailability),
                       ],
                     ),
                   ),
@@ -128,128 +174,80 @@ class _CookingScreenState extends State<CookingScreen> {
                   const SizedBox(height: 4),
                   const Text('Choose how you plan to cook.'),
                   const SizedBox(height: 12),
-                  SizedBox(
-                    height: 92,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: MockCatalog.cookingMethods.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 10),
-                      itemBuilder: (context, index) {
-                        final String method = MockCatalog.cookingMethods[index];
-                        final bool selected = method == _method;
-                        return InkWell(
-                          onTap: () => setState(() => _method = method),
-                          borderRadius: BorderRadius.circular(16),
-                          child: Container(
-                            width: 86,
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: selected ? AppColors.teal : AppColors.line,
-                                width: selected ? 2 : 1,
-                              ),
-                            ),
-                            child: Column(
-                              children: [
-                                Icon(
-                                  _iconFor(method),
-                                  color: selected
-                                      ? AppColors.tealDark
-                                      : AppColors.muted,
+                  if (item.cooking.isEmpty)
+                    const SoftCard(
+                      child: Text(
+                        'No cooking-suitability scores are on file for this species yet.',
+                      ),
+                    )
+                  else
+                    SizedBox(
+                      height: 92,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: item.cooking.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 10),
+                        itemBuilder: (context, index) {
+                          final CookingSuitability row = item.cooking[index];
+                          final bool selectedChip = row.method == _method;
+                          return InkWell(
+                            onTap: () => setState(() => _method = row.method),
+                            borderRadius: BorderRadius.circular(16),
+                            child: Container(
+                              width: 86,
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: selectedChip ? AppColors.teal : AppColors.line,
+                                  width: selectedChip ? 2 : 1,
                                 ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  method,
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    color: selected
-                                        ? AppColors.ink
+                              ),
+                              child: Column(
+                                children: [
+                                  Icon(
+                                    _iconFor(row.method),
+                                    color: selectedChip
+                                        ? AppColors.tealDark
                                         : AppColors.muted,
                                   ),
-                                ),
-                                if (selected && best)
-                                  const Text(
-                                    'Best match',
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    row.method,
+                                    textAlign: TextAlign.center,
                                     style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: selectedChip
+                                          ? AppColors.ink
+                                          : AppColors.muted,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${row.starsOutOfFive}/5',
+                                    style: const TextStyle(
                                       fontSize: 9,
                                       color: AppColors.tealDark,
                                       fontWeight: FontWeight.w700,
                                     ),
                                   ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SoftCard(
-                    color: AppColors.tealSoft,
-                    child: Text(
-                      best
-                          ? '${item.commonName} is recommended for $_method based on our cooking-method suitability data.'
-                          : '${item.commonName} can work for $_method, but another method may suit better.',
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  SoftCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${_method[0].toUpperCase()}${_method.substring(1)} suitability',
-                          style: const TextStyle(fontWeight: FontWeight.w800),
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Container(
-                              width: 92,
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: AppColors.navy,
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: Text(
-                                best ? '5/5\nExcellent\nmatch' : '3/5\nOkay\nmatch',
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            const Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('• Holds shape well on grill'),
-                                  Text('• Mild flavour, pairs easily'),
-                                  Text('• Moist & flaky when cooked'),
-                                  Text('• Great for quick, everyday meals'),
                                 ],
                               ),
                             ),
-                            SizedBox(
-                              width: 64,
-                              height: 64,
-                              child: NetworkFishImage(
-                                url: MockCatalog.grilled,
-                                borderRadius: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                          );
+                        },
+                      ),
                     ),
-                  ),
+                  if (selected != null) ...[
+                    const SizedBox(height: 12),
+                    SoftCard(
+                      color: AppColors.tealSoft,
+                      child: Text(
+                        '${item.shortName} scored ${selected.starsOutOfFive}/5 for ${selected.method}. ${selected.rationale}',
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 14),
                   Row(
                     children: [
@@ -299,34 +297,24 @@ class _CookingScreenState extends State<CookingScreen> {
                                 style: TextStyle(fontWeight: FontWeight.w800),
                               ),
                               const SizedBox(height: 10),
-                              Text(
-                                'RM ${item.priceLow.toStringAsFixed(0)} – ${item.priceHigh.toStringAsFixed(0)}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 20,
-                                  color: AppColors.tealDark,
-                                ),
-                              ),
-                              const Text('Average price (RM/kg)'),
-                              const SizedBox(height: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.goodSoft,
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                                child: const Text(
-                                  'Affordable',
-                                  style: TextStyle(
-                                    color: AppColors.good,
+                              if (priced)
+                                Text(
+                                  'RM ${_price!.latestPriceRmPerKg!.toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 20,
+                                    color: AppColors.tealDark,
+                                  ),
+                                )
+                              else
+                                Text(
+                                  _price?.status ?? 'Insufficient data',
+                                  style: const TextStyle(
                                     fontWeight: FontWeight.w800,
-                                    fontSize: 12,
+                                    fontSize: 14,
                                   ),
                                 ),
-                              ),
+                              const Text('Observed PriceCatcher / kg'),
                             ],
                           ),
                         ),
@@ -335,44 +323,9 @@ class _CookingScreenState extends State<CookingScreen> {
                   ),
                   const SizedBox(height: 14),
                   SoftCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Best time to buy',
-                          style: TextStyle(fontWeight: FontWeight.w800),
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            for (int i = 0; i < 12; i++)
-                              CircleAvatar(
-                                radius: 12,
-                                backgroundColor: i >= 2 && i <= 7
-                                    ? AppColors.navy
-                                    : AppColors.tealSoft,
-                                child: Text(
-                                  const <String>[
-                                    'J', 'F', 'M', 'A', 'M', 'J',
-                                    'J', 'A', 'S', 'O', 'N', 'D',
-                                  ][i],
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
-                                    color: i >= 2 && i <= 7
-                                        ? Colors.white
-                                        : AppColors.navy,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        const Text(
-                          'Available year-round, with highest supply typically from March to August.',
-                        ),
-                      ],
+                    child: Text(
+                      item.supply?.summary ??
+                          'Species-level supply is not invented here. National landings context appears when it has been loaded.',
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -406,17 +359,20 @@ class _CookingScreenState extends State<CookingScreen> {
   }
 
   IconData _iconFor(String method) {
-    switch (method) {
+    switch (method.toLowerCase()) {
+      case 'grill':
       case 'grilling':
         return Icons.outdoor_grill;
       case 'soup':
         return Icons.soup_kitchen;
       case 'curry':
         return Icons.rice_bowl;
+      case 'fry':
       case 'stir-fry':
         return Icons.restaurant;
-      case 'rice dish':
-        return Icons.dinner_dining;
+      case 'steam':
+      case 'steaming':
+        return Icons.kitchen;
       default:
         return Icons.more_horiz;
     }

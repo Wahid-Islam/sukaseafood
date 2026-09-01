@@ -258,6 +258,7 @@ class HealthOut(BaseModel):
     status: str
     app: str
     version: str
+    git_sha: str | None = None
 
 class DatabaseHealthOut(BaseModel):
     """Dependency health — what /health/db reports.

@@ -4,17 +4,28 @@ import 'package:provider/provider.dart';
 
 import '../../core/auth/auth_controller.dart';
 import '../../core/theme/app_theme.dart';
+import '../../data/catalog/catalog_controller.dart';
 import '../../data/mock/mock_catalog.dart';
+import '../../data/models/seafood.dart';
 import '../../shared/widgets/ui_kit.dart';
+import 'notifications_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  int _unreadAlerts = NotificationsScreen.noticeCount;
 
   @override
   Widget build(BuildContext context) {
     final String displayName = context.watch<AuthController>().displayName;
-    final SeafoodItem featured = MockCatalog.featured;
-    final List<SeafoodItem> favourites = MockCatalog.items.take(3).toList();
+    final CatalogController catalog = context.watch<CatalogController>();
+    final SeafoodSummary? featured = catalog.featured;
+    final List<SeafoodSummary> favourites = catalog.favourites;
 
     return Scaffold(
       backgroundColor: AppColors.foam,
@@ -43,33 +54,41 @@ class HomeScreen extends StatelessWidget {
                         Stack(
                           children: [
                             IconButton(
-                              onPressed: () {},
+                              tooltip: 'Price and landing alerts',
+                              onPressed: () async {
+                                await context.push('/notifications');
+                                if (!mounted) return;
+                                setState(() => _unreadAlerts = 0);
+                              },
                               icon: const Icon(
                                 Icons.notifications_none_rounded,
                                 color: Colors.white,
                               ),
                             ),
-                            Positioned(
-                              right: 10,
-                              top: 10,
-                              child: Container(
-                                width: 16,
-                                height: 16,
-                                alignment: Alignment.center,
-                                decoration: const BoxDecoration(
-                                  color: AppColors.avoid,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Text(
-                                  '2',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w800,
+                            if (_unreadAlerts > 0)
+                              Positioned(
+                                right: 10,
+                                top: 10,
+                                child: IgnorePointer(
+                                  child: Container(
+                                    width: 16,
+                                    height: 16,
+                                    alignment: Alignment.center,
+                                    decoration: const BoxDecoration(
+                                      color: AppColors.avoid,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Text(
+                                      '$_unreadAlerts',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
                           ],
                         ),
                       ],
@@ -119,10 +138,26 @@ class HomeScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _FeaturedCard(item: featured),
+                  if (catalog.isLoading && featured == null)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 24),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else if (featured != null)
+                    _FeaturedCard(
+                      item: featured,
+                      price: catalog.featuredPrice,
+                    )
+                  else if (catalog.error != null)
+                    SoftCard(
+                      child: Text(
+                        'Catalogue is temporarily unavailable. ${catalog.error}',
+                      ),
+                    ),
                   const SizedBox(height: 18),
-                  const SoftCard(
-                    child: Column(
+                  SoftCard(
+                    onTap: () => context.push('/price/SF001'),
+                    child: const Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         SectionLabel(
@@ -130,47 +165,21 @@ class HomeScreen extends StatelessWidget {
                           icon: Icons.tsunami,
                         ),
                         SizedBox(height: 10),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Selangor landings',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.ink,
-                                    ),
-                                  ),
-                                  SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      Text(
-                                        '↑ 12%',
-                                        style: TextStyle(
-                                          color: AppColors.tealDark,
-                                          fontWeight: FontWeight.w800,
-                                          fontSize: 28,
-                                        ),
-                                      ),
-                                      SizedBox(width: 8),
-                                      Text('vs last week'),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Icon(
-                              Icons.show_chart,
-                              color: AppColors.teal,
-                              size: 48,
-                            ),
-                          ],
+                        Text(
+                          'Selangor outlook',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.ink,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Live four-week forecasts cover Selangor, the engine’s production scope.',
+                          style: TextStyle(color: AppColors.muted),
                         ),
                         SizedBox(height: 8),
                         Text(
-                          'View details →',
+                          'View Kembung outlook →',
                           style: TextStyle(
                             color: AppColors.tealDark,
                             fontWeight: FontWeight.w700,
@@ -182,13 +191,13 @@ class HomeScreen extends StatelessWidget {
                   const SizedBox(height: 18),
                   SoftCard(
                     padding: EdgeInsets.zero,
-                    onTap: () => context.push('/cooking/selar'),
+                    onTap: () => context.push('/cooking/SF011'),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(20),
                       child: Stack(
                         children: [
                           NetworkFishImage(
-                            url: MockCatalog.cookingDish,
+                            url: featured?.imageUrl ?? MockCatalog.cookingDish,
                             height: 130,
                             borderRadius: 0,
                           ),
@@ -259,22 +268,29 @@ class HomeScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  SizedBox(
-                    height: 176,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: favourites.length,
-                      separatorBuilder: (context, index) =>
-                          const SizedBox(width: 12),
-                      itemBuilder: (context, index) {
-                        final SeafoodItem item = favourites[index];
-                        return _FavouriteCard(
-                          item: item,
-                          onTap: () => context.push('/seafood/${item.id}'),
-                        );
-                      },
+                  if (favourites.isEmpty)
+                    const SoftCard(
+                      child: Text(
+                        'No saved species yet. Open a fish profile and tap the heart to keep it here.',
+                      ),
+                    )
+                  else
+                    SizedBox(
+                      height: 176,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: favourites.length,
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(width: 12),
+                        itemBuilder: (context, index) {
+                          final SeafoodSummary item = favourites[index];
+                          return _FavouriteCard(
+                            item: item,
+                            onTap: () => context.push('/seafood/${item.fishId}'),
+                          );
+                        },
+                      ),
                     ),
-                  ),
                   const SizedBox(height: 88),
                 ],
               ),
@@ -339,15 +355,17 @@ class _SearchRow extends StatelessWidget {
 }
 
 class _FeaturedCard extends StatelessWidget {
-  const _FeaturedCard({required this.item});
+  const _FeaturedCard({required this.item, this.price});
 
-  final SeafoodItem item;
+  final SeafoodSummary item;
+  final PriceContext? price;
 
   @override
   Widget build(BuildContext context) {
+    final bool priced = price?.isDisplayable == true;
     return SoftCard(
       padding: EdgeInsets.zero,
-      onTap: () => context.push('/seafood/${item.id}'),
+      onTap: () => context.push('/seafood/${item.fishId}'),
       child: Column(
         children: [
           Padding(
@@ -360,7 +378,7 @@ class _FeaturedCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        item.commonName,
+                        item.shortName,
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                       Text(
@@ -372,22 +390,26 @@ class _FeaturedCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Text(item.about, maxLines: 2, overflow: TextOverflow.ellipsis),
+                      Text(item.fishType),
                       const SizedBox(height: 10),
-                      ClassificationPill(label: item.classification),
+                      ClassificationPill(
+                        label: item.classification ?? 'UNDETERMINED',
+                      ),
                       const SizedBox(height: 10),
-                      Text(
-                        'RM${item.priceRm.toStringAsFixed(2)} /kg',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 22,
-                          color: AppColors.ink,
+                      if (priced)
+                        Text(
+                          'RM${price!.latestPriceRmPerKg!.toStringAsFixed(2)} /kg',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 22,
+                            color: AppColors.ink,
+                          ),
+                        )
+                      else
+                        const Text(
+                          'Observed PriceCatcher price is not displayable yet.',
+                          style: TextStyle(fontSize: 13, color: AppColors.muted),
                         ),
-                      ),
-                      Text(
-                        'Range: RM${item.priceLow.toStringAsFixed(2)} – RM${item.priceHigh.toStringAsFixed(2)} /kg',
-                        style: const TextStyle(fontSize: 12),
-                      ),
                     ],
                   ),
                 ),
@@ -409,29 +431,16 @@ class _FeaturedCard extends StatelessWidget {
                 color: AppColors.goodSoft,
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: Column(
+              child: const Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Why it’s a good choice',
+                  Text(
+                    'Live catalogue',
                     style: TextStyle(fontWeight: FontWeight.w800),
                   ),
-                  const SizedBox(height: 8),
-                  ...item.whyGood.map(
-                    (String line) => Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.check_circle,
-                            size: 16,
-                            color: AppColors.good,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(child: Text(line)),
-                        ],
-                      ),
-                    ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Names, ratings and prices on this card come from the production API. Open the profile for sustainability, cooking and the four-week outlook.',
                   ),
                 ],
               ),
@@ -446,12 +455,11 @@ class _FeaturedCard extends StatelessWidget {
 class _FavouriteCard extends StatelessWidget {
   const _FavouriteCard({required this.item, required this.onTap});
 
-  final SeafoodItem item;
+  final SeafoodSummary item;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final bool down = item.priceChangePct < 0;
     return SizedBox(
       width: 132,
       child: SoftCard(
@@ -477,23 +485,17 @@ class _FavouriteCard extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              item.commonName,
+              item.shortName,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
             ),
             Text(
-              'RM ${item.priceRm.toStringAsFixed(2)} /kg',
+              item.classification ?? 'UNDETERMINED',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: AppColors.tealDark,
-                fontWeight: FontWeight.w700,
-                fontSize: 11,
-              ),
-            ),
-            Text(
-              '${down ? '↓' : '↑'} ${item.priceChangePct.abs().toStringAsFixed(0)}%',
-              style: TextStyle(
-                color: down ? AppColors.good : AppColors.avoid,
                 fontWeight: FontWeight.w700,
                 fontSize: 11,
               ),

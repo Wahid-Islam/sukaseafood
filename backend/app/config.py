@@ -11,10 +11,12 @@ class Settings(BaseSettings):
 
     # --- Application -------------------------------------------------------
     app_name: str = "SukaSeafood API"
-    app_version: str = "0.2.0"
+    app_version: str = "0.3.0"
     api_prefix: str = "/api/v1"
     environment: str = "development"
     cors_origins: list[str] = ["*"]
+    # Set at Cloud Run deploy so /health names the build QA tested against.
+    git_sha: str = ""
 
     # --- Database ----------------------------------------------------------
     # PostgreSQL is the system of record. There is no SQLite fallback: the I1

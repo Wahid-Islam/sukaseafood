@@ -23,7 +23,6 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app import firebase
 from app.config import get_settings
 from app.models import (
     CookingMethod,
@@ -125,8 +124,15 @@ def _fish_type(item: SeafoodItem) -> str:
 
 
 def _image_url(item: SeafoodItem) -> str | None:
-    """Prefer the canonical primary_image_url; fall back to Firebase Storage."""
-    return item.primary_image_url or firebase.image_url(item.code)
+    """Return a URL the client can actually load, or None.
+
+    Firebase Storage paths derived from `code` 404'd in production for every
+    species. Emitting those URLs made catalogue cards look broken. A missing
+    photo degrades to a placeholder; a 404 JSON body does not.
+    """
+    if item.primary_image_url:
+        return item.primary_image_url
+    return None
 
 
 # --- reads -------------------------------------------------------------------

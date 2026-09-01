@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart' show MediaType;
@@ -7,6 +6,7 @@ import 'package:http_parser/http_parser.dart' show MediaType;
 import '../../core/constants/app_constants.dart';
 import '../models/identify_result.dart';
 import '../models/price_forecast.dart';
+import '../models/seafood.dart';
 
 /// A failed API call, carrying the backend's own error code where it sent one.
 ///
@@ -58,16 +58,21 @@ class ApiClient {
   /// Identify a fish from one photograph.
   ///
   /// The image is uploaded, inferred against and dropped; the backend stores no
-  /// user photographs and does not reuse them as training data.
-  Future<IdentifyResult> identify(File image) async {
+  /// user photographs and does not reuse them as training data. Bytes rather
+  /// than a filesystem path so the same call works on Android and on web.
+  Future<IdentifyResult> identify({
+    required List<int> bytes,
+    required String filename,
+  }) async {
     final http.MultipartRequest request =
         http.MultipartRequest('POST', _uri('/identify'));
 
     request.files.add(
-      await http.MultipartFile.fromPath(
+      http.MultipartFile.fromBytes(
         'file',
-        image.path,
-        contentType: _mediaTypeFor(image.path),
+        bytes,
+        filename: filename.isEmpty ? 'capture.jpg' : filename,
+        contentType: _mediaTypeFor(filename),
       ),
     );
 
@@ -107,9 +112,168 @@ class ApiClient {
     }
   }
 
+  /// Compact catalogue cards (`GET /seafood` and `GET /search`).
+  Future<List<SeafoodSummary>> listSeafood() async {
+    try {
+      final http.Response response = await _client
+          .get(
+            _uri('/seafood'),
+            headers: const <String, String>{'Accept': 'application/json'},
+          )
+          .timeout(_timeout);
+      return _decodeList(response)
+          .whereType<Map<String, dynamic>>()
+          .map(SeafoodSummary.fromJson)
+          .toList();
+    } on ApiException {
+      rethrow;
+    } catch (error) {
+      throw ApiException(_unreachableMessage(error));
+    }
+  }
+
+  Future<List<SeafoodSummary>> search(String query) async {
+    try {
+      final http.Response response = await _client
+          .get(
+            _uri('/search', <String, String>{'q': query}),
+            headers: const <String, String>{'Accept': 'application/json'},
+          )
+          .timeout(_timeout);
+      final Map<String, dynamic> body = _decode(response);
+      final List<dynamic> results =
+          body['results'] as List<dynamic>? ?? const <dynamic>[];
+      return results
+          .whereType<Map<String, dynamic>>()
+          .map(SeafoodSummary.fromJson)
+          .toList();
+    } on ApiException {
+      rethrow;
+    } catch (error) {
+      throw ApiException(_unreachableMessage(error));
+    }
+  }
+
+  Future<SeafoodProfile> profile(String fishId) async {
+    try {
+      final http.Response response = await _client
+          .get(
+            _uri('/seafood/$fishId'),
+            headers: const <String, String>{'Accept': 'application/json'},
+          )
+          .timeout(_timeout);
+      return SeafoodProfile.fromJson(_decode(response));
+    } on ApiException {
+      rethrow;
+    } catch (error) {
+      throw ApiException(_unreachableMessage(error));
+    }
+  }
+
+  Future<PriceContext> price(String fishId) async {
+    try {
+      final http.Response response = await _client
+          .get(
+            _uri('/seafood/$fishId/price'),
+            headers: const <String, String>{'Accept': 'application/json'},
+          )
+          .timeout(_timeout);
+      return PriceContext.fromJson(_decode(response));
+    } on ApiException {
+      rethrow;
+    } catch (error) {
+      throw ApiException(_unreachableMessage(error));
+    }
+  }
+
+  Future<List<SeafoodSummary>> favourites({required String token}) async {
+    try {
+      final http.Response response = await _client
+          .get(
+            _uri('/me/favourites'),
+            headers: _authHeaders(token),
+          )
+          .timeout(_timeout);
+      return _decodeList(response)
+          .whereType<Map<String, dynamic>>()
+          .map(SeafoodSummary.fromJson)
+          .toList();
+    } on ApiException {
+      rethrow;
+    } catch (error) {
+      throw ApiException(_unreachableMessage(error));
+    }
+  }
+
+  Future<SeafoodSummary> addFavourite({
+    required String token,
+    required String fishId,
+  }) async {
+    try {
+      final http.Response response = await _client
+          .post(
+            _uri('/me/favourites'),
+            headers: <String, String>{
+              ..._authHeaders(token),
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode(<String, String>{'fish_id': fishId}),
+          )
+          .timeout(_timeout);
+      return SeafoodSummary.fromJson(_decode(response));
+    } on ApiException {
+      rethrow;
+    } catch (error) {
+      throw ApiException(_unreachableMessage(error));
+    }
+  }
+
+  Future<void> removeFavourite({
+    required String token,
+    required String fishId,
+  }) async {
+    try {
+      final http.Response response = await _client
+          .delete(
+            _uri('/me/favourites/$fishId'),
+            headers: _authHeaders(token),
+          )
+          .timeout(_timeout);
+      if (response.statusCode == 204) return;
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw _errorFrom(response);
+      }
+    } on ApiException {
+      rethrow;
+    } catch (error) {
+      throw ApiException(_unreachableMessage(error));
+    }
+  }
+
   void close() => _client.close();
 
   // --- internals ------------------------------------------------------------
+
+  Map<String, String> _authHeaders(String token) {
+    return <String, String>{
+      'Accept': 'application/json',
+      'Authorization': 'Bearer $token',
+    };
+  }
+
+  List<dynamic> _decodeList(http.Response response) {
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw _errorFrom(response);
+    }
+    final Object? decoded = jsonDecode(response.body);
+    if (decoded is! List<dynamic>) {
+      throw ApiException(
+        'Unexpected response shape from the API.',
+        statusCode: response.statusCode,
+      );
+    }
+    return decoded;
+  }
 
   Map<String, dynamic> _decode(http.Response response) {
     if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -158,9 +322,6 @@ class ApiClient {
   }
 
   String _unreachableMessage(Object error) {
-    if (error is SocketException || error is HttpException) {
-      return 'Cannot reach the SukaSeafood API. Is the backend running?';
-    }
     return 'Cannot reach the SukaSeafood API ($error).';
   }
 

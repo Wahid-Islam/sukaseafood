@@ -9,6 +9,7 @@ import '../../features/explore/explore_screen.dart';
 import '../../features/favorites/favorites_screen.dart';
 import '../../features/home/app_shell.dart';
 import '../../features/home/home_screen.dart';
+import '../../features/home/notifications_screen.dart';
 import '../../features/price/price_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/scan/scan_screen.dart';
@@ -83,6 +84,10 @@ GoRouter createRouter(AuthController auth) {
             ],
           ),
         ],
+      ),
+      GoRoute(
+        path: '/notifications',
+        builder: (context, state) => const NotificationsScreen(),
       ),
       GoRoute(
         path: '/seafood/:id',

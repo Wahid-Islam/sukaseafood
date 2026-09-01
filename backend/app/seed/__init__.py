@@ -42,8 +42,8 @@ async def _execute_file(engine: AsyncEngine, path: Path) -> None:
 
 
 async def apply_schema(engine: AsyncEngine | None = None) -> None:
-    """Create the V3 tables, enums, functions, indexes, forecast columns and
-    app_user. Idempotent."""
+    """Create the V3 tables, enums, functions, indexes, forecast columns,
+    app_user and account favourites. Idempotent."""
     engine = engine or default_engine
     for name in (
         "v3_initial_schema.sql",
@@ -51,6 +51,7 @@ async def apply_schema(engine: AsyncEngine | None = None) -> None:
         "v3_functions_indexes.sql",
         "v3_forecast_contract.sql",
         "i1_app_user.sql",
+        "v3_user_prefs.sql",
     ):
         path = SCHEMA_DIR / name
         logger.info("Applying schema file %s", path.name)

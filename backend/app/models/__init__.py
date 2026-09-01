@@ -956,6 +956,33 @@ class AppUser(Base):
         nullable=False,
         server_default=text("now()"),
     )
+    preferred_location_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("location.location_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+
+class UserFavourite(Base):
+    """One saved species for one account. Empty for a newly created user."""
+
+    __tablename__ = "user_favourite"
+
+    app_user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("app_user.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    seafood_item_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("seafood_item.seafood_item_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
 
 
 __all__ = [
@@ -992,5 +1019,6 @@ __all__ = [
     "SourceSnapshot",
     "SupplyLandingPoint",
     "SustainabilityRating",
+    "UserFavourite",
     "WwfAssessment",
 ]

@@ -22,6 +22,7 @@ from app.schemas import (
 from app.models import SeafoodItem
 from app.services import cv as cv_service
 from app.services import forecast as forecast_service
+from app.services import read_cache
 from app.services import seafood as seafood_service
 
 router = APIRouter()
@@ -40,6 +41,7 @@ async def health() -> HealthOut:
         status="ok",
         app=settings.app_name,
         version=settings.app_version,
+        git_sha=settings.git_sha or None,
     )
 
 
@@ -78,9 +80,14 @@ async def database_health(db: AsyncSession = Depends(get_db)) -> DatabaseHealthO
 async def list_supported_seafood(
     db: AsyncSession = Depends(get_db),
 ) -> list[SeafoodSummaryOut]:
-    """List the five Iteration 1 supported species."""
+    """List every active canonical species."""
+    cached = read_cache.get("seafood:list", ttl_seconds=60)
+    if isinstance(cached, list):
+        return cached
     items = await seafood_service.list_seafood(db)
-    return [seafood_service.to_summary(i) for i in items]
+    summaries = [seafood_service.to_summary(i) for i in items]
+    read_cache.put("seafood:list", summaries)
+    return summaries
 
 
 @router.get("/search", response_model=SearchResponse)
@@ -89,11 +96,17 @@ async def search(
     db: AsyncSession = Depends(get_db),
 ) -> SearchResponse:
     """Search by local name, English name, or scientific name."""
+    cache_key = f"seafood:search:{q.strip().lower()}"
+    cached = read_cache.get(cache_key, ttl_seconds=60)
+    if isinstance(cached, SearchResponse):
+        return cached
     items = await seafood_service.search_seafood(db, q)
-    return SearchResponse(
+    payload = SearchResponse(
         query=q,
         results=[seafood_service.to_summary(i) for i in items],
     )
+    read_cache.put(cache_key, payload)
+    return payload
 
 
 @router.get("/seafood/{fish_id}", response_model=SeafoodProfileOut)
@@ -153,9 +166,15 @@ async def seafood_price_forecast(
         )
 
     try:
-        return await forecast_service.get_forecast(
+        cache_key = f"forecast:{item.code}:{location_id or 'default'}:{weeks}"
+        cached = read_cache.get(cache_key, ttl_seconds=120)
+        if isinstance(cached, PriceForecastOut):
+            return cached
+        payload = await forecast_service.get_forecast(
             db, item, location_id=location_id, weeks=weeks
         )
+        read_cache.put(cache_key, payload)
+        return payload
     except forecast_service.InvalidLocation as exc:
         raise HTTPException(
             status_code=400,

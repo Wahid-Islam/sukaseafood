@@ -124,25 +124,32 @@ class NetworkFishImage extends StatelessWidget {
     this.borderRadius = 16,
   });
 
-  final String url;
+  final String? url;
   final double? height;
   final double borderRadius;
 
   @override
   Widget build(BuildContext context) {
+    final Widget placeholder = Container(
+      height: height ?? 140,
+      color: AppColors.tealSoft,
+      alignment: Alignment.center,
+      child: const Icon(Icons.set_meal, color: AppColors.navy, size: 36),
+    );
+    if (url == null || url!.isEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(borderRadius),
+        child: placeholder,
+      );
+    }
     return ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
       child: Image.network(
-        url,
+        url!,
         height: height,
         width: double.infinity,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => Container(
-          height: height ?? 140,
-          color: AppColors.tealSoft,
-          alignment: Alignment.center,
-          child: const Icon(Icons.set_meal, color: AppColors.navy, size: 36),
-        ),
+        errorBuilder: (_, _, _) => placeholder,
         loadingBuilder: (context, child, progress) {
           if (progress == null) return child;
           return Container(
@@ -151,6 +158,9 @@ class NetworkFishImage extends StatelessWidget {
             alignment: Alignment.center,
             child: const CircularProgressIndicator(strokeWidth: 2),
           );
+        },
+        headers: const <String, String>{
+          'User-Agent': 'SukaSeafood/1.0 (Flutter; educational)',
         },
       ),
     );
@@ -181,6 +191,9 @@ class DarkHeader extends StatelessWidget {
             Image.network(
               backgroundUrl!,
               fit: BoxFit.cover,
+              headers: const <String, String>{
+                'User-Agent': 'SukaSeafood/1.0 (Flutter; educational)',
+              },
               errorBuilder: (_, __, ___) => const ColoredBox(color: AppColors.navy),
             )
           else

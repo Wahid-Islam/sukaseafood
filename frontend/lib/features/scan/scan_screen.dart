@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -57,7 +55,10 @@ class _ScanScreenState extends State<ScanScreen> {
     });
 
     try {
-      final IdentifyResult result = await _api.identify(File(file.path));
+      final IdentifyResult result = await _api.identify(
+        bytes: await file.readAsBytes(),
+        filename: file.name,
+      );
       if (!mounted) return;
       setState(() {
         _result = result;

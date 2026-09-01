@@ -17,6 +17,7 @@ Two selection rules that decide what a shopper actually sees:
 
 from __future__ import annotations
 
+import uuid
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
@@ -86,8 +87,18 @@ async def resolve_location(
     price under another state's name.
     """
     if location_id:
+        # Parse before touching Postgres. asyncpg + a UUID column will spend
+        # ~15s then 500 on a string like "selangor"; a syntactically valid but
+        # unknown UUID already returned 400 INVALID_LOCATION. Reject the
+        # malformed case at the same boundary.
+        try:
+            location_uuid = uuid.UUID(str(location_id).strip())
+        except (ValueError, AttributeError, TypeError) as exc:
+            raise InvalidLocation(
+                "location_id must be a UUID."
+            ) from exc
         location = await session.scalar(
-            select(Location).where(Location.location_id == location_id)
+            select(Location).where(Location.location_id == location_uuid)
         )
         if location is None:
             raise InvalidLocation(f"Unknown location_id {location_id!r}.")

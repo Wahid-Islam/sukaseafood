@@ -30,6 +30,10 @@ class AuthController extends ChangeNotifier {
   bool get isBusy => _busy;
   String? get error => _error;
   String get displayName => _profile?.name ?? 'Friend';
+  String? get accessToken => _service?.token;
+  String? get forecastLocationId => _profile?.forecastLocationId;
+  String get forecastLocationName =>
+      _profile?.forecastLocationName ?? 'Selangor';
 
   Future<void> bootstrap() async {
     if (!_useApi) {
