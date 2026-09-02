@@ -27,5 +27,11 @@ void main() {
       find.textContaining('Amir', findRichText: true),
       findsWidgets,
     );
+    expect(find.textContaining('RECOMMENDED FISH OF THE WEEK'), findsOneWidget);
+    expect(find.textContaining('Tenggiri'), findsWidgets);
+    // Home must not surface prices or a live catalogue strip.
+    expect(find.textContaining('RM'), findsNothing);
+    expect(find.textContaining('Live catalogue'), findsNothing);
+    expect(find.textContaining('Live catalog'), findsNothing);
   });
 }
