@@ -7,6 +7,8 @@ import '../../core/theme/app_theme.dart';
 import '../../data/mock/mock_catalog.dart';
 import '../../shared/widgets/ui_kit.dart';
 
+/// Home matches PotentialScreenrendersI1: recommended fish first, then pulse,
+/// cooking inspiration, and equal-sized favourites — no prices or live catalogue.
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
@@ -119,7 +121,12 @@ class HomeScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _FeaturedCard(item: featured),
+                  const SectionLabel(
+                    title: 'Recommended fish of the week',
+                    icon: Icons.star_rounded,
+                  ),
+                  const SizedBox(height: 10),
+                  _RecommendedFishCard(item: featured),
                   const SizedBox(height: 18),
                   const SoftCard(
                     child: Column(
@@ -187,7 +194,7 @@ class HomeScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(20),
                       child: Stack(
                         children: [
-                          NetworkFishImage(
+                          const NetworkFishImage(
                             url: MockCatalog.cookingDish,
                             height: 130,
                             borderRadius: 0,
@@ -260,7 +267,7 @@ class HomeScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   SizedBox(
-                    height: 176,
+                    height: _FavouriteCard.cardHeight,
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
                       itemCount: favourites.length,
@@ -338,8 +345,9 @@ class _SearchRow extends StatelessWidget {
   }
 }
 
-class _FeaturedCard extends StatelessWidget {
-  const _FeaturedCard({required this.item});
+/// Featured / fish-of-the-week card — sample layout without price.
+class _RecommendedFishCard extends StatelessWidget {
+  const _RecommendedFishCard({required this.item});
 
   final SeafoodItem item;
 
@@ -348,11 +356,12 @@ class _FeaturedCard extends StatelessWidget {
     return SoftCard(
       padding: EdgeInsets.zero,
       onTap: () => context.push('/seafood/${item.id}'),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-            child: Row(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
@@ -372,72 +381,121 @@ class _FeaturedCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Text(item.about, maxLines: 2, overflow: TextOverflow.ellipsis),
-                      const SizedBox(height: 10),
-                      ClassificationPill(label: item.classification),
-                      const SizedBox(height: 10),
                       Text(
-                        'RM${item.priceRm.toStringAsFixed(2)} /kg',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 22,
-                          color: AppColors.ink,
+                        item.about,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(height: 1.35),
+                      ),
+                      const SizedBox(height: 12),
+                      ClassificationPill(label: item.classification),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                SizedBox(
+                  width: 132,
+                  height: 148,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Positioned.fill(
+                        child: NetworkFishImage(
+                          url: item.imageUrl,
+                          borderRadius: 16,
                         ),
                       ),
-                      Text(
-                        'Range: RM${item.priceLow.toStringAsFixed(2)} – RM${item.priceHigh.toStringAsFixed(2)} /kg',
-                        style: const TextStyle(fontSize: 12),
+                      Positioned(
+                        top: 8,
+                        left: 8,
+                        right: 8,
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.94),
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.navy.withValues(alpha: 0.08),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Why it’s a good choice',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 10,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              ...item.whyGood.take(3).map(
+                                    (String line) => Padding(
+                                      padding: const EdgeInsets.only(bottom: 2),
+                                      child: Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          const Icon(
+                                            Icons.check_circle,
+                                            size: 11,
+                                            color: AppColors.good,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Expanded(
+                                            child: Text(
+                                              line,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(fontSize: 9),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                            ],
+                          ),
+                        ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 10),
-                SizedBox(
-                  width: 110,
-                  height: 110,
-                  child: NetworkFishImage(url: item.imageUrl, borderRadius: 16),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Text(
+                  'View seafood profile',
+                  style: TextStyle(
+                    color: AppColors.tealDark,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: const BoxDecoration(
+                    color: AppColors.navy,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.arrow_forward_rounded,
+                    color: Colors.white,
+                    size: 18,
+                  ),
                 ),
               ],
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: AppColors.goodSoft,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Why it’s a good choice',
-                    style: TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                  const SizedBox(height: 8),
-                  ...item.whyGood.map(
-                    (String line) => Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.check_circle,
-                            size: 16,
-                            color: AppColors.good,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(child: Text(line)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -446,26 +504,29 @@ class _FeaturedCard extends StatelessWidget {
 class _FavouriteCard extends StatelessWidget {
   const _FavouriteCard({required this.item, required this.onTap});
 
+  static const double cardWidth = 140;
+  static const double cardHeight = 168;
+  static const double imageHeight = 88;
+
   final SeafoodItem item;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final bool down = item.priceChangePct < 0;
     return SizedBox(
-      width: 132,
+      width: cardWidth,
+      height: cardHeight,
       child: SoftCard(
         padding: const EdgeInsets.all(10),
         onTap: onTap,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Stack(
               children: [
                 NetworkFishImage(
                   url: item.imageUrl,
-                  height: 64,
+                  height: imageHeight,
                   borderRadius: 12,
                 ),
                 const Positioned(
@@ -475,26 +536,21 @@ class _FavouriteCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Text(
               item.commonName,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
             ),
+            const SizedBox(height: 6),
             Text(
-              'RM ${item.priceRm.toStringAsFixed(2)} /kg',
+              item.fishType,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: AppColors.tealDark,
-                fontWeight: FontWeight.w700,
-                fontSize: 11,
-              ),
-            ),
-            Text(
-              '${down ? '↓' : '↑'} ${item.priceChangePct.abs().toStringAsFixed(0)}%',
-              style: TextStyle(
-                color: down ? AppColors.good : AppColors.avoid,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w600,
                 fontSize: 11,
               ),
             ),
