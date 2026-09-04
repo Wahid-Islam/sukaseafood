@@ -17,6 +17,7 @@ are editorial decisions that must be visible in code review:
 from __future__ import annotations
 
 import random
+import re
 import uuid
 
 from sqlalchemy import func, select
@@ -31,7 +32,6 @@ from app.models import (
     PriceTrendPoint,
     SeafoodAlias,
     SeafoodItem,
-    SupplyLandingPoint,
     WwfAssessment,
 )
 from app.models.enums import PeriodType, PriceQuality, SustainabilityRating
@@ -40,11 +40,11 @@ from app.schemas import (
     CookingSuitabilityOut,
     IdentifyCandidate,
     IdentifyResponse,
+    MethodRatingOut,
     PriceContextOut,
     PricePointOut,
     SeafoodProfileOut,
     SeafoodSummaryOut,
-    SupplyContextOut,
     SustainabilityOut,
 )
 
@@ -55,6 +55,14 @@ RATING_LABELS: dict[SustainabilityRating, str] = {
     SustainabilityRating.BEST_CHOICE: "GOOD CHOICE",
     SustainabilityRating.REDUCE: "REDUCE",
     SustainabilityRating.AVOID: "AVOID",
+}
+
+METHOD_LABELS: dict[str, str] = {
+    "HOOK_AND_LINE": "Hook-and-line",
+    "GILLNET": "Gillnet",
+    "PURSE_SEINE": "Purse seine",
+    "TRAWL": "Trawl",
+    "AQUACULTURE": "Farmed",
 }
 
 UNDETERMINED = "UNDETERMINED"
@@ -108,8 +116,7 @@ PRICE_DISCLAIMER = (
 def _assessment_loader():
     """Eager-load a species' WWF assessments AND their snapshots.
 
-    `_assessment()` picks the most recently retrieved assessment, which reads
-    `snapshot.retrieved_at`. Without loading the snapshot up front, that read is
+    `_display_assessments()` reads `snapshot.retrieved_at`. Without loading the snapshot up front, that read is
     lazy IO in a sync context and SQLAlchemy raises MissingGreenlet — so this
     chain is load-bearing, not an optimisation.
     """
@@ -149,7 +156,12 @@ async def list_seafood(session: AsyncSession) -> list[SeafoodItem]:
     return list(await session.scalars(stmt))
 
 
-async def get_seafood_by_id(session: AsyncSession, fish_id: str) -> SeafoodItem | None:
+async def get_seafood_by_id(
+    session: AsyncSession,
+    fish_id: str,
+    *,
+    relations: bool = True,
+) -> SeafoodItem | None:
     """Resolve a seafood identifier to a canonical record.
 
     Accepts either form of the identifier:
@@ -180,14 +192,15 @@ async def get_seafood_by_id(session: AsyncSession, fish_id: str) -> SeafoodItem 
     stmt = (
         select(SeafoodItem)
         .where(predicate)
-        .options(
+    )
+    if relations:
+        stmt = stmt.options(
             selectinload(SeafoodItem.aliases),
             _assessment_loader(),
             selectinload(SeafoodItem.cooking_suitability).selectinload(
                 CookingSuitability.method
             ),
         )
-    )
     return await session.scalar(stmt)
 
 
@@ -244,38 +257,83 @@ async def recommend_for_cooking(session: AsyncSession, method: str) -> list[Seaf
 # --- mapping to the API contract ---------------------------------------------
 
 
-def _assessment(item: SeafoodItem) -> WwfAssessment | None:
-    """The assessment to display, or None for UNDETERMINED.
+def _display_assessments(item: SeafoodItem) -> list[WwfAssessment]:
+    """Latest-snapshot assessments, one per catch method, better rating first."""
+    rows = list(item.wwf_assessments or [])
+    if not rows:
+        return []
 
-    A species can accumulate assessments across snapshots; the most recently
-    retrieved one wins.
-    """
-    if not item.wwf_assessments:
-        return None
-    return max(
-        item.wwf_assessments,
-        key=lambda a: (a.snapshot.retrieved_at if a.snapshot else None) or "",
+    def retrieved(row: WwfAssessment):
+        return row.snapshot.retrieved_at if row.snapshot else None
+
+    latest = max((retrieved(row) for row in rows), default=None)
+    if latest is not None:
+        rows = [row for row in rows if retrieved(row) == latest] or rows
+
+    seen: set[str] = set()
+    unique: list[WwfAssessment] = []
+    for row in rows:
+        key = (
+            row.production_method_code
+            or row.production_method_raw
+            or row.source_record_key
+            or ""
+        ).upper()
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(row)
+
+    rank = {"GOOD CHOICE": 0, "REDUCE": 1, "AVOID": 2}
+    unique.sort(
+        key=lambda row: (
+            rank.get(RATING_LABELS[row.rating], 9),
+            _method_label(row),
+        )
+    )
+    return unique
+
+
+def _method_label(assessment: WwfAssessment) -> str:
+    code = (assessment.production_method_code or "").upper()
+    if code in METHOD_LABELS:
+        return METHOD_LABELS[code]
+    raw = (assessment.production_method_raw or "").strip()
+    cleaned = re.sub(r"\s*\([^)]*\)\s*", "", raw).strip()
+    return cleaned or raw or "Unknown method"
+
+
+def _to_method_rating(assessment: WwfAssessment) -> MethodRatingOut:
+    return MethodRatingOut(
+        classification=RATING_LABELS[assessment.rating],
+        production_method=_method_label(assessment),
+        production_method_code=(assessment.production_method_code or "OTHER"),
+        origin=assessment.origin_raw or "Malaysia",
+        explanation=_applies_to(assessment),
     )
 
 
 def to_summary(item: SeafoodItem) -> SeafoodSummaryOut:
     """Compact card for search results and lists."""
-    assessment = _assessment(item)
+    rows = _display_assessments(item)
+    labels = {RATING_LABELS[row.rating] for row in rows}
+    classification = next(iter(labels)) if len(labels) == 1 else UNDETERMINED
     return SeafoodSummaryOut(
         fish_id=item.code,
         scientific_name=item.scientific_name,
         primary_common_name=item.canonical_name_ms,
         fish_type=_fish_type(item),
         image_url=_image_url(item),
-        classification=RATING_LABELS[assessment.rating] if assessment else UNDETERMINED,
+        classification=classification,
     )
 
 
 def to_sustainability(item: SeafoodItem) -> SustainabilityOut:
     """WWF payload, including the honest 'we don't know' case."""
-    assessment = _assessment(item)
+    rows = _display_assessments(item)
+    method_ratings = [_to_method_rating(row) for row in rows]
 
-    if assessment is None:
+    if not rows:
         return SustainabilityOut(
             classification=UNDETERMINED,
             origin="Varies — confirm at purchase",
@@ -285,19 +343,54 @@ def to_sustainability(item: SeafoodItem) -> SustainabilityOut:
             source_name="WWF Save Our Seafood",
             source_url="https://www.saveourseafood.my/",
             verified=False,
+            assessments=[],
         )
 
-    explanation = assessment.context or assessment.notes_raw or ""
+    labels = {RATING_LABELS[row.rating] for row in rows}
+    if len(labels) > 1:
+        context = (rows[0].context or "").strip()
+        return SustainabilityOut(
+            classification=UNDETERMINED,
+            origin="Varies — confirm catch method at purchase",
+            production_method=" / ".join(
+                _method_label(row) for row in rows
+            ),
+            explanation="Rating varies by catch method.",
+            why_it_matters=context or UNDETERMINED_WHY,
+            source_name="WWF Save Our Seafood",
+            source_url="https://www.saveourseafood.my/",
+            verified=True,
+            assessments=method_ratings,
+        )
+
+    assessment = rows[0]
+    applies = _applies_to(assessment)
+    context = (assessment.context or "").strip()
+    why = context if context and not context.startswith("Applies to") else WHY_IT_MATTERS[
+        assessment.rating
+    ]
     return SustainabilityOut(
         classification=RATING_LABELS[assessment.rating],
         origin=assessment.origin_raw or "Malaysia",
         production_method=assessment.production_method_raw or "",
-        explanation=explanation,
-        why_it_matters=WHY_IT_MATTERS[assessment.rating],
+        explanation=applies,
+        why_it_matters=why,
         source_name="WWF Save Our Seafood",
         source_url="https://www.saveourseafood.my/",
         verified=True,
+        assessments=method_ratings,
     )
+
+
+def _applies_to(assessment: WwfAssessment) -> str:
+    """Short applicability line for the classification card."""
+    stored = (assessment.context or "").strip()
+    if stored.startswith("Applies to"):
+        return stored
+    name = assessment.common_name_raw or "this species"
+    origin = assessment.origin_raw or "the listed origin"
+    method = assessment.production_method_raw or "the listed method"
+    return f"Applies to {origin} {name} taken by {method}."
 
 
 async def build_profile(session: AsyncSession, item: SeafoodItem) -> SeafoodProfileOut:
@@ -331,53 +424,6 @@ async def build_profile(session: AsyncSession, item: SeafoodItem) -> SeafoodProf
             )
             for c in cooking
         ],
-        supply=await get_supply_context(session),
-    )
-
-
-async def get_supply_context(session: AsyncSession) -> SupplyContextOut | None:
-    """National landings context.
-
-    Deliberately NOT species-specific: the published landings data has no
-    species dimension, so attaching it to one fish would invent a fact.
-    """
-    stmt = (
-        select(SupplyLandingPoint)
-        .where(SupplyLandingPoint.scope_level == "NATIONAL")
-        .order_by(SupplyLandingPoint.period_month.desc())
-        .limit(13)
-    )
-    points = list(await session.scalars(stmt))
-
-    if not points:
-        return SupplyContextOut(
-            summary=(
-                "Landings data has not been loaded yet. Supply context is "
-                "unavailable rather than estimated."
-            ),
-            trend_label="Unavailable",
-            source_name="OpenDOSM Fish Landings",
-        )
-
-    latest = points[0]
-    year_ago = points[-1] if len(points) == 13 else None
-
-    trend = "Stable"
-    if year_ago and year_ago.landings_mt:
-        change = float(latest.landings_mt - year_ago.landings_mt) / float(year_ago.landings_mt)
-        if change > 0.05:
-            trend = "Rising"
-        elif change < -0.05:
-            trend = "Declining"
-
-    return SupplyContextOut(
-        summary=(
-            f"National marine landings for {latest.period_month:%B %Y} were "
-            f"{float(latest.landings_mt):,.0f} tonnes. This is whole-fishery "
-            "context, not a species-level forecast."
-        ),
-        trend_label=trend,
-        source_name="OpenDOSM Fish Landings",
     )
 
 
@@ -429,17 +475,23 @@ async def get_price_context(session: AsyncSession, fish_id: str) -> PriceContext
     trend.reverse()
 
     change_pct = None
-    if len(trend) >= 2 and trend[0].weekly_median_price:
-        change_pct = round(
-            float(trend[-1].weekly_median_price - trend[0].weekly_median_price)
-            / float(trend[0].weekly_median_price)
-            * 100,
-            1,
-        )
+    if len(trend) >= 2 and trend[-2].weekly_median_price:
+        prev = float(trend[-2].weekly_median_price)
+        if prev:
+            change_pct = round(
+                (float(trend[-1].weekly_median_price) - prev) / prev * 100,
+                1,
+            )
+
+    latest = (
+        float(trend[-1].weekly_median_price)
+        if trend
+        else float(summary.median_price)
+    )
 
     return PriceContextOut(
         fish_id=item.code,
-        latest_price_rm_per_kg=float(summary.median_price),
+        latest_price_rm_per_kg=latest,
         status="Observed",
         change_vs_recent_pct=change_pct,
         history=[
@@ -508,7 +560,6 @@ __all__ = [
     "build_profile",
     "get_price_context",
     "get_seafood_by_id",
-    "get_supply_context",
     "list_seafood",
     "mock_identify",
     "recommend_for_cooking",

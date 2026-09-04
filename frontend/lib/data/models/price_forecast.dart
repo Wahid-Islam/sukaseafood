@@ -93,7 +93,9 @@ class ForecastWeek {
 
   factory ForecastWeek.fromJson(Map<String, dynamic> json) {
     return ForecastWeek(
-      weekStart: DateTime.tryParse(json['forecast_week_start'] as String? ?? ''),
+      weekStart: DateTime.tryParse(
+        json['forecast_week_start'] as String? ?? '',
+      ),
       horizonWeeks: (json['horizon_weeks'] as num?)?.toInt(),
       expectedPrice: (json['expected_price'] as num?)?.toDouble() ?? 0,
       lowerBound: (json['lower_bound'] as num?)?.toDouble() ?? 0,
@@ -132,6 +134,7 @@ class PriceForecast {
     required this.reference,
     required this.weeks,
     required this.modelVersionName,
+    this.intervalLevel,
     required this.generatedAt,
     required this.disclaimer,
   });
@@ -143,6 +146,7 @@ class PriceForecast {
   final ForecastReference reference;
   final List<ForecastWeek> weeks;
   final String modelVersionName;
+  final double? intervalLevel;
   final DateTime? generatedAt;
   final String disclaimer;
 
@@ -175,8 +179,10 @@ class PriceForecast {
           .map(ForecastWeek.fromJson)
           .toList(),
       modelVersionName: model['version_name'] as String? ?? '',
+      intervalLevel: (model['interval_level'] as num?)?.toDouble(),
       generatedAt: DateTime.tryParse(json['generated_at'] as String? ?? ''),
-      disclaimer: json['disclaimer'] as String? ??
+      disclaimer:
+          json['disclaimer'] as String? ??
           'An estimated range, not an official or guaranteed price.',
     );
   }

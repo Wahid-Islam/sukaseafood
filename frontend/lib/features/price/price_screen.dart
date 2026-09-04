@@ -1,4 +1,3 @@
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -10,23 +9,27 @@ import '../../data/catalog/catalog_controller.dart';
 import '../../data/catalog/fish_ids.dart';
 import '../../data/models/price_forecast.dart' as api;
 import '../../data/models/seafood.dart';
+import '../../shared/widgets/catalogue_fish_art.dart';
 import '../../shared/widgets/ui_kit.dart';
 import 'forecast_card.dart';
+import 'historical_trend_card.dart';
+import 'week_over_week.dart';
 
 class PriceScreen extends StatefulWidget {
-  const PriceScreen({super.key, required this.seafoodId});
+  const PriceScreen({super.key, required this.seafoodId, this.initialTab});
 
   final String seafoodId;
+
+  /// Kept so older `/price/:id?tab=` links still open this page.
+  final String? initialTab;
 
   @override
   State<PriceScreen> createState() => _PriceScreenState();
 }
 
 class _PriceScreenState extends State<PriceScreen> {
-  final ApiClient _api = ApiClient();
-
   late final String _fishId = FishIds.canonical(widget.seafoodId);
-  int _tab = 0;
+
   bool _loading = true;
   SeafoodProfile? _profile;
   PriceContext? _price;
@@ -39,49 +42,51 @@ class _PriceScreenState extends State<PriceScreen> {
     _load();
   }
 
-  @override
-  void dispose() {
-    _api.close();
-    super.dispose();
-  }
-
   Future<void> _load() async {
     final CatalogController catalog = context.read<CatalogController>();
-    final String? locationId = context.read<AuthController>().forecastLocationId;
+    final String? locationId = context
+        .read<AuthController>()
+        .forecastLocationId;
+    final Future<SeafoodProfile> profileFut = catalog.profile(_fishId);
+    final Future<PriceContext> priceFut = catalog.price(_fishId);
+    final Future<api.PriceForecast> forecastFut = catalog.forecast(
+      _fishId,
+      locationId: locationId,
+    );
+    SeafoodProfile? profile;
+    PriceContext? price;
+    api.PriceForecast? forecast;
+    ApiException? forecastError;
     try {
-      final SeafoodProfile profile = await catalog.profile(_fishId);
-      PriceContext? price;
-      try {
-        price = await catalog.price(_fishId);
-      } catch (_) {
-        price = null;
-      }
-      try {
-        final api.PriceForecast forecast =
-            await _api.forecast(_fishId, locationId: locationId);
-        if (!mounted) return;
-        setState(() {
-          _profile = profile;
-          _price = price;
-          _forecast = forecast;
-          _loading = false;
-        });
-      } on ApiException catch (error) {
-        if (!mounted) return;
-        setState(() {
-          _profile = profile;
-          _price = price;
-          _forecastError = error;
-          _loading = false;
-        });
-      }
+      profile = await profileFut;
     } catch (error) {
       if (!mounted) return;
       setState(() {
         _forecastError = ApiException(error.toString());
         _loading = false;
       });
+      return;
     }
+    try {
+      price = await priceFut;
+    } catch (_) {
+      price = null;
+    }
+    try {
+      forecast = await forecastFut;
+    } on ApiException catch (error) {
+      forecastError = error;
+    } catch (error) {
+      forecastError = ApiException(error.toString());
+    }
+    if (!mounted) return;
+    setState(() {
+      _profile = profile;
+      _price = price;
+      _forecast = forecast;
+      _forecastError = forecastError;
+      _loading = false;
+    });
   }
 
   @override
@@ -98,6 +103,7 @@ class _PriceScreenState extends State<PriceScreen> {
           SliverToBoxAdapter(
             child: DarkHeader(
               height: 210,
+              backgroundAsset: CatalogueFishArt.photoAssetFor(_fishId),
               backgroundUrl: item?.imageUrl,
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(8, 0, 8, 0),
@@ -108,7 +114,10 @@ class _PriceScreenState extends State<PriceScreen> {
                       children: [
                         IconButton(
                           onPressed: () => context.pop(),
-                          icon: const Icon(Icons.arrow_back, color: Colors.white),
+                          icon: const Icon(
+                            Icons.arrow_back,
+                            color: Colors.white,
+                          ),
                         ),
                         const Spacer(),
                       ],
@@ -119,10 +128,9 @@ class _PriceScreenState extends State<PriceScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Price & Supply',
-                            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                  color: Colors.white,
-                                ),
+                            'Price',
+                            style: Theme.of(context).textTheme.headlineMedium
+                                ?.copyWith(color: Colors.white),
                           ),
                           Text(
                             'Observed PriceCatcher prices and the live four-week outlook.',
@@ -157,6 +165,7 @@ class _PriceScreenState extends State<PriceScreen> {
           ),
           SliverToBoxAdapter(
             child: SheetBody(
+              topPadding: 32,
               child: _loading
                   ? const Padding(
                       padding: EdgeInsets.symmetric(vertical: 40),
@@ -164,55 +173,18 @@ class _PriceScreenState extends State<PriceScreen> {
                     )
                   : Column(
                       children: [
-                        SoftCard(
-                          padding: const EdgeInsets.all(8),
-                          child: Row(
-                            children: [
-                              _TabChip(
-                                label: 'Current',
-                                icon: Icons.credit_card,
-                                selected: _tab == 0,
-                                onTap: () => setState(() => _tab = 0),
-                              ),
-                              _TabChip(
-                                label: 'Trend',
-                                icon: Icons.show_chart,
-                                selected: _tab == 1,
-                                onTap: () => setState(() => _tab = 1),
-                              ),
-                              _TabChip(
-                                label: 'Outlook',
-                                icon: Icons.center_focus_strong,
-                                selected: _tab == 2,
-                                onTap: () => setState(() => _tab = 2),
-                              ),
-                              _TabChip(
-                                label: 'Supply',
-                                icon: Icons.sailing,
-                                selected: _tab == 3,
-                                onTap: () => setState(() => _tab = 3),
-                              ),
-                            ],
-                          ),
+                        _currentRow(),
+                        const SizedBox(height: 14),
+                        HistoricalTrendCard(
+                          history: _price?.history ?? const [],
                         ),
                         const SizedBox(height: 14),
-                        if (_tab == 0) _currentCard(),
-                        if (_tab == 1) _trendCard(),
-                        if (_tab == 2)
-                          ForecastCard(
-                            forecast: _forecast,
-                            error: _forecastError,
-                            loading: false,
-                          ),
-                        if (_tab == 3) _supplyCard(),
-                        if (_tab != 2) ...[
-                          const SizedBox(height: 14),
-                          ForecastCard(
-                            forecast: _forecast,
-                            error: _forecastError,
-                            loading: false,
-                          ),
-                        ],
+                        ForecastCard(
+                          forecast: _forecast,
+                          error: _forecastError,
+                          loading: false,
+                          history: _price?.history ?? const [],
+                        ),
                         const SizedBox(height: 14),
                         const SoftCard(
                           child: Text(
@@ -232,171 +204,186 @@ class _PriceScreenState extends State<PriceScreen> {
     );
   }
 
+  static const TextStyle _metricTitleStyle = TextStyle(
+    fontWeight: FontWeight.w800,
+    fontSize: 13,
+    height: 1.2,
+  );
+
+  Widget _metricTitle(String title, {Widget? trailing}) {
+    return SizedBox(
+      height: 36,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: _metricTitleStyle,
+            ),
+          ),
+          ?trailing,
+        ],
+      ),
+    );
+  }
+
+  Widget _currentRow() {
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(flex: 3, child: _currentCard()),
+          const SizedBox(width: 10),
+          Expanded(flex: 2, child: _comparedCard()),
+        ],
+      ),
+    );
+  }
+
+  Widget _splitCard({required List<Widget> header, Widget? footer}) {
+    return SoftCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [...header, ?footer],
+      ),
+    );
+  }
+
   Widget _currentCard() {
     final PriceContext? price = _price;
     final bool priced = price?.isDisplayable == true;
-    return SoftCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Current Observed Price',
-            style: TextStyle(fontWeight: FontWeight.w800),
+    return _splitCard(
+      header: [
+        _metricTitle('Current Observed Price'),
+        const SizedBox(height: 8),
+        if (priced)
+          Text(
+            'RM ${price!.observedPriceRmPerKg!.toStringAsFixed(2)} /kg',
+            style: const TextStyle(
+              color: AppColors.good,
+              fontWeight: FontWeight.w900,
+              fontSize: 26,
+            ),
+          )
+        else
+          Text(
+            price?.status ?? 'Insufficient data',
+            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20),
           ),
-          const SizedBox(height: 8),
-          if (priced)
-            Text(
-              'RM ${price!.latestPriceRmPerKg!.toStringAsFixed(2)} /kg',
-              style: const TextStyle(
-                color: AppColors.good,
-                fontWeight: FontWeight.w900,
-                fontSize: 30,
-              ),
-            )
-          else
-            Text(
-              price?.status ?? 'Insufficient data',
-              style: const TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 20,
+        Text(
+          priced
+              ? 'Latest observed price from PriceCatcher'
+              : 'PriceCatcher does not have enough recent observations to '
+                    'show a current market price. The four-week outlook '
+                    'below is the forecast engine’s range, not a live '
+                    'stall price.',
+          style: const TextStyle(fontSize: 12, color: AppColors.muted),
+        ),
+      ],
+      footer: itemClassification.isEmpty
+          ? null
+          : Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: ClassificationPill(
+                label: itemClassification,
+                caption: _classificationCaption(itemClassification),
               ),
             ),
-          Text(
-            priced
-                ? 'Latest observed price from PriceCatcher'
-                : (price?.disclaimer ??
-                    'Not enough recent PriceCatcher observations to display a number.'),
-          ),
-          if (itemClassification.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            ClassificationPill(label: itemClassification),
-          ],
-        ],
-      ),
     );
   }
 
-  String get itemClassification =>
-      _profile?.classification ?? '';
+  String get itemClassification => _profile?.classification ?? '';
 
-  Widget _trendCard() {
-    final List<ObservedPricePoint> history = _price?.history ?? const [];
-    if (history.isEmpty) {
-      return const SoftCard(
-        child: Text(
-          'No displayable PriceCatcher history for this species yet. '
-          'The four-week outlook below is modelled separately and is not a substitute.',
+  String? _classificationCaption(String label) {
+    switch (label.toUpperCase()) {
+      case 'GOOD CHOICE':
+      case 'BEST CHOICE':
+        return 'A sustainable and responsible choice.';
+      case 'REDUCE':
+        return 'Better to eat this less often.';
+      case 'AVOID':
+        return 'Choose a different species if you can.';
+      default:
+        return null;
+    }
+  }
+
+  Widget _comparedCard() {
+    final WeekOverWeek? change = WeekOverWeek.fromHistory(
+      _price?.history ?? const [],
+    );
+    if (change == null) {
+      return SoftCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _metricTitle('Compared to last week'),
+            const SizedBox(height: 8),
+            const Text(
+              'Need two weekly PriceCatcher points to compare.',
+              style: TextStyle(color: AppColors.muted),
+            ),
+          ],
         ),
       );
     }
-    return SoftCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Historical Trend',
-            style: TextStyle(fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 180,
-            child: LineChart(
-              LineChartData(
-                gridData: const FlGridData(show: false),
-                borderData: FlBorderData(show: false),
-                titlesData: const FlTitlesData(
-                  topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                ),
-                lineBarsData: [
-                  LineChartBarData(
-                    isCurved: true,
-                    color: AppColors.good,
-                    barWidth: 3,
-                    spots: [
-                      for (int i = 0; i < history.length; i++)
-                        FlSpot(i.toDouble(), history[i].priceRmPerKg),
-                    ],
-                    dotData: const FlDotData(show: true),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _supplyCard() {
-    final SupplyContext? supply = _profile?.supply;
-    return SoftCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Supply context',
-            style: TextStyle(fontWeight: FontWeight.w800),
+    final bool down = change.fell;
+    final Color colour = down
+        ? AppColors.good
+        : change.rose
+        ? AppColors.avoid
+        : AppColors.muted;
+    final IconData icon = down
+        ? Icons.arrow_downward
+        : change.rose
+        ? Icons.arrow_upward
+        : Icons.trending_flat;
+    final String pct = '${change.percent.abs().toStringAsFixed(0)}%';
+
+    return _splitCard(
+      header: [
+        _metricTitle(
+          'Compared to last week',
+          trailing: const InfoButton(
+            message:
+                'Change between the latest two weekly Selangor medians. '
+                'Not a forecast.',
           ),
-          const SizedBox(height: 8),
-          Text(
-            supply?.summary ??
-                'Species-level landings are not published. We do not invent a pulse.',
-          ),
-          if (supply != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              '${supply.trendLabel} · ${supply.sourceName}',
-              style: const TextStyle(color: AppColors.muted, fontSize: 12),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Icon(icon, color: colour, size: 26),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                pct,
+                style: TextStyle(
+                  color: colour,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 26,
+                ),
+              ),
             ),
           ],
-        ],
-      ),
-    );
-  }
-}
-
-class _TabChip extends StatelessWidget {
-  const _TabChip({
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          margin: const EdgeInsets.all(2),
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: selected ? AppColors.goodSoft : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            children: [
-              Icon(icon, size: 16, color: selected ? AppColors.good : AppColors.muted),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: selected ? AppColors.good : AppColors.muted,
-                ),
-              ),
-            ],
-          ),
+        ),
+        const Text(
+          'Previous weekly PriceCatcher median',
+          style: TextStyle(fontSize: 12, color: AppColors.muted),
+        ),
+      ],
+      footer: Padding(
+        padding: const EdgeInsets.only(top: 10),
+        child: CaptionedPill(
+          color: colour,
+          icon: Icons.history,
+          label: 'Last week',
+          caption: 'RM ${change.previousPrice.toStringAsFixed(2)} /kg',
         ),
       ),
     );

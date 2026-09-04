@@ -20,6 +20,8 @@ class AuthService {
 
   static const String _tokenKey = 'sukaseafood_access_token';
 
+  static const Duration _timeout = Duration(seconds: 45);
+
   final http.Client _client;
   String? _token;
 
@@ -48,15 +50,17 @@ class AuthService {
     required String email,
     required String password,
   }) async {
-    final http.Response response = await _client.post(
-      _uri('/auth/signup'),
-      headers: const {'Content-Type': 'application/json'},
-      body: jsonEncode(<String, String>{
-        'name': name.trim(),
-        'email': email.trim().toLowerCase(),
-        'password': password,
-      }),
-    );
+    final http.Response response = await _client
+        .post(
+          _uri('/auth/signup'),
+          headers: const {'Content-Type': 'application/json'},
+          body: jsonEncode(<String, String>{
+            'name': name.trim(),
+            'email': email.trim().toLowerCase(),
+            'password': password,
+          }),
+        )
+        .timeout(_timeout);
     return _parseAuthResponse(response);
   }
 
@@ -64,26 +68,30 @@ class AuthService {
     required String email,
     required String password,
   }) async {
-    final http.Response response = await _client.post(
-      _uri('/auth/login'),
-      headers: const {'Content-Type': 'application/json'},
-      body: jsonEncode(<String, String>{
-        'email': email.trim().toLowerCase(),
-        'password': password,
-      }),
-    );
+    final http.Response response = await _client
+        .post(
+          _uri('/auth/login'),
+          headers: const {'Content-Type': 'application/json'},
+          body: jsonEncode(<String, String>{
+            'email': email.trim().toLowerCase(),
+            'password': password,
+          }),
+        )
+        .timeout(_timeout);
     return _parseAuthResponse(response);
   }
 
   Future<UserProfile?> loadCurrentUser() async {
     if (!hasToken) return null;
-    final http.Response response = await _client.get(
-      _uri('/auth/me'),
-      headers: <String, String>{
-        'Authorization': 'Bearer $_token',
-        'Content-Type': 'application/json',
-      },
-    );
+    final http.Response response = await _client
+        .get(
+          _uri('/auth/me'),
+          headers: <String, String>{
+            'Authorization': 'Bearer $_token',
+            'Content-Type': 'application/json',
+          },
+        )
+        .timeout(_timeout);
     if (response.statusCode == 401) {
       await signOut();
       return null;

@@ -47,7 +47,7 @@ FROM (VALUES
 
   ('SF014', 'Siakap Putih', 'Asian Seabass', 'Lates calcarifer',
    'species', 'Latidae', 'coastal / farmed',
-   'Barramundi, farmed and wild-caught, and the default restaurant steamed fish. Stable year-round supply keeps its price steadier than most wild species.',
+   'Barramundi, farmed and wild-caught, and the default restaurant steamed fish. Year-round farming keeps its price steadier than most wild species.',
    FALSE,
    'PriceCatcher lists this as "Siakap"; WWF uses "Siakap Putih". The WWF name is canonical here so the sustainability and price journeys agree.')
 ) AS v(code, canonical_name_ms, display_name_en, scientific_name,

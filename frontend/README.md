@@ -12,7 +12,7 @@ Flutter UI matched to `PotentialScreenrendersI1.pdf`.
 | `/favorites` | Saved seafood |
 | `/profile` | Guest profile shell |
 | `/seafood/:id` | Sustainability detail |
-| `/price/:id` | Price & supply |
+| `/price/:id` | Price (observed + outlook) |
 | `/cooking/:id` | Cooking intent |
 
 ## Data

@@ -189,7 +189,7 @@ class MockCatalog {
       classificationBlurb: 'Responsibly farmed tilapia is a smart everyday choice.',
       whyGood: const [
         'Often more sustainable than pressured wild stocks',
-        'Stable supply',
+        'Year-round farmed availability',
         'Budget-friendly',
       ],
       priceRm: 12.5,

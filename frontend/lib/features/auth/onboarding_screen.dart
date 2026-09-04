@@ -44,9 +44,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (ok) {
       context.go('/home');
     } else if (auth.error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(auth.error!)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(auth.error!)));
     }
   }
 
@@ -68,22 +68,22 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.waves, color: AppColors.teal),
+                      const BrandLogo(size: 36),
                       const SizedBox(width: 8),
                       Text(
                         'SukaSeafood',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              color: Colors.white,
-                            ),
+                        style: Theme.of(
+                          context,
+                        ).textTheme.titleLarge?.copyWith(color: Colors.white),
                       ),
                     ],
                   ),
                   const Spacer(),
                   Text(
                     'Create your profile',
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          color: Colors.white,
-                        ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.headlineMedium?.copyWith(color: Colors.white),
                   ),
                   const SizedBox(height: 6),
                   Text(

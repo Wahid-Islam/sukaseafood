@@ -59,9 +59,9 @@ FROM (VALUES
 
   ('SF005', 'Kerapu Bintik', 'Orange-spotted Grouper', 'Epinephelus coioides',
    'species', 'Serranidae', 'marine demersal',
-   'High-value reef fish, wild-caught or farmed depending on supplier. Supply and price both swing widely, and sustainability depends entirely on production method.',
+   'High-value reef fish, wild-caught or farmed depending on the seller. Price swings widely, and sustainability depends entirely on production method.',
    TRUE,
-   'High-value reef fish, wild-caught or farmed depending on supplier. Supply and price both swing widely, and sustainability depends entirely on production method.')
+   'High-value reef fish, wild-caught or farmed depending on the seller. Price swings widely, and sustainability depends entirely on production method.')
 ) AS v(code, canonical_name_ms, display_name_en, scientific_name,
        taxonomic_level, family, fish_type, description, supports_cv, notes)
 ON CONFLICT (seafood_item_id) DO UPDATE SET

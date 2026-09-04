@@ -70,6 +70,9 @@ def client():
     from fastapi.testclient import TestClient
 
     from app.main import app
+    from app.services import read_cache
 
+    read_cache.clear()
     with TestClient(app) as c:
         yield c
+        read_cache.clear()

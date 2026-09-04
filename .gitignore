@@ -40,9 +40,14 @@ frontend/android/app/release/
 frontend/**/*.iml
 frontend/.idea/
 
+# Local zip extract of catalogue photos; committed copies live in assets/
+frontend/Images/
+
 # Large raw OpenDOSM monthly extracts (fetch via data/README.md)
 data/open_dosm/*.csv
 data/open_dosm/*.parquet
+data/open_dosm/**/*.csv
+data/open_dosm/**/*.parquet
 
 # Firebase
 .firebase/

@@ -6,6 +6,7 @@ import '../../core/theme/app_theme.dart';
 import '../../data/catalog/catalog_controller.dart';
 import '../../data/catalog/fish_ids.dart';
 import '../../data/models/seafood.dart';
+import '../../shared/widgets/catalogue_fish_art.dart';
 import '../../shared/widgets/ui_kit.dart';
 
 class CookingScreen extends StatefulWidget {
@@ -35,10 +36,12 @@ class _CookingScreenState extends State<CookingScreen> {
   Future<void> _load() async {
     final CatalogController catalog = context.read<CatalogController>();
     try {
-      final SeafoodProfile profile = await catalog.profile(_fishId);
+      final Future<SeafoodProfile> profileFut = catalog.profile(_fishId);
+      final Future<PriceContext> priceFut = catalog.price(_fishId);
+      final SeafoodProfile profile = await profileFut;
       PriceContext? price;
       try {
-        price = await catalog.price(_fishId);
+        price = await priceFut;
       } catch (_) {
         price = null;
       }
@@ -105,7 +108,19 @@ class _CookingScreenState extends State<CookingScreen> {
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  NetworkFishImage(url: item.imageUrl, borderRadius: 0),
+                  CatalogueFishArt.photoAssetFor(item.fishId) != null
+                      ? Image.asset(
+                          CatalogueFishArt.photoAssetFor(item.fishId)!,
+                          fit: BoxFit.cover,
+                        )
+                      : CatalogueFishArt(
+                          fishId: item.fishId,
+                          networkUrl: item.imageUrl,
+                          width: 800,
+                          height: 240,
+                          borderRadius: 0,
+                          fit: BoxFit.cover,
+                        ),
                   DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
@@ -127,10 +142,9 @@ class _CookingScreenState extends State<CookingScreen> {
                       children: [
                         Text(
                           item.shortName,
-                          style: Theme.of(context)
-                              .textTheme
-                              .displayLarge
-                              ?.copyWith(fontSize: 34),
+                          style: Theme.of(
+                            context,
+                          ).textTheme.displayLarge?.copyWith(fontSize: 34),
                         ),
                         Text(
                           item.scientificName,
@@ -162,7 +176,10 @@ class _CookingScreenState extends State<CookingScreen> {
                       children: [
                         _MiniFact(label: 'Type', value: item.fishType),
                         _MiniFact(label: 'Common in', value: item.commonIn),
-                        _MiniFact(label: 'Market', value: item.marketAvailability),
+                        _MiniFact(
+                          label: 'Market',
+                          value: item.marketAvailability,
+                        ),
                       ],
                     ),
                   ),
@@ -200,7 +217,9 @@ class _CookingScreenState extends State<CookingScreen> {
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
-                                  color: selectedChip ? AppColors.teal : AppColors.line,
+                                  color: selectedChip
+                                      ? AppColors.teal
+                                      : AppColors.line,
                                   width: selectedChip ? 2 : 1,
                                 ),
                               ),
@@ -266,13 +285,15 @@ class _CookingScreenState extends State<CookingScreen> {
                                   ChoiceChip(
                                     label: const Text('2 people'),
                                     selected: _people == 2,
-                                    onSelected: (_) => setState(() => _people = 2),
+                                    onSelected: (_) =>
+                                        setState(() => _people = 2),
                                   ),
                                   const SizedBox(width: 6),
                                   ChoiceChip(
                                     label: const Text('4 people'),
                                     selected: _people == 4,
-                                    onSelected: (_) => setState(() => _people = 4),
+                                    onSelected: (_) =>
+                                        setState(() => _people = 4),
                                   ),
                                 ],
                               ),
@@ -299,7 +320,7 @@ class _CookingScreenState extends State<CookingScreen> {
                               const SizedBox(height: 10),
                               if (priced)
                                 Text(
-                                  'RM ${_price!.latestPriceRmPerKg!.toStringAsFixed(2)}',
+                                  'RM ${_price!.observedPriceRmPerKg!.toStringAsFixed(2)}',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.w900,
                                     fontSize: 20,
@@ -323,13 +344,6 @@ class _CookingScreenState extends State<CookingScreen> {
                   ),
                   const SizedBox(height: 14),
                   SoftCard(
-                    child: Text(
-                      item.supply?.summary ??
-                          'Species-level supply is not invented here. National landings context appears when it has been loaded.',
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  SoftCard(
                     color: const Color(0xFFF3EEFF),
                     child: Row(
                       children: [
@@ -345,7 +359,11 @@ class _CookingScreenState extends State<CookingScreen> {
                             ],
                           ),
                         ),
-                        Icon(Icons.menu_book, color: Colors.deepPurple.shade300, size: 36),
+                        Icon(
+                          Icons.menu_book,
+                          color: Colors.deepPurple.shade300,
+                          size: 36,
+                        ),
                       ],
                     ),
                   ),
@@ -390,7 +408,10 @@ class _MiniFact extends StatelessWidget {
     return Expanded(
       child: Column(
         children: [
-          Text(label, style: const TextStyle(fontSize: 10, color: AppColors.muted)),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 10, color: AppColors.muted),
+          ),
           Text(
             value,
             textAlign: TextAlign.center,

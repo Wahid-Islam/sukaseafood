@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/catalog/catalog_controller.dart';
 import '../../data/models/seafood.dart';
+import '../../shared/widgets/catalogue_fish_art.dart';
 import '../../shared/widgets/ui_kit.dart';
 
 class ExploreScreen extends StatefulWidget {
@@ -44,8 +45,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
     setState(() => _searching = true);
     _debounce = Timer(const Duration(milliseconds: 350), () async {
       try {
-        final List<SeafoodSummary> found =
-            await context.read<CatalogController>().search(q);
+        final List<SeafoodSummary> found = await context
+            .read<CatalogController>()
+            .search(q);
         if (!mounted) return;
         setState(() {
           _results = found;
@@ -82,7 +84,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 children: [
                   const Row(
                     children: [
-                      Icon(Icons.waves, color: AppColors.teal),
+                      BrandLogo(size: 36),
                       SizedBox(width: 8),
                       Expanded(
                         child: Column(
@@ -111,9 +113,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   const SizedBox(height: 12),
                   RichText(
                     text: TextSpan(
-                      style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                            fontSize: 34,
-                          ),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.displayLarge?.copyWith(fontSize: 34),
                       children: const [
                         TextSpan(text: 'Cari '),
                         TextSpan(
@@ -126,7 +128,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   const SizedBox(height: 4),
                   Text(
                     'Find. Understand. Choose better.',
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.7),
+                    ),
                   ),
                 ],
               ),
@@ -150,10 +154,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       filled: true,
                       fillColor: Colors.white,
                       prefixIcon: const Icon(Icons.search),
-                      suffixIcon: IconButton(
-                        onPressed: () => context.go('/scan'),
-                        icon: const Icon(Icons.qr_code_scanner),
-                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(16),
                         borderSide: const BorderSide(color: AppColors.line),
@@ -165,35 +165,14 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  SoftCard(
-                    color: const Color(0xFFEAF4F8),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.photo_camera_outlined, color: AppColors.navy),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Text(
-                            'Not sure what fish it is? Snap a photo of the fish in front of you to identify it and get smarter choices.',
-                            style: TextStyle(color: AppColors.ink, fontSize: 13),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        FilledButton(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: AppColors.navy,
-                            foregroundColor: Colors.white,
-                          ),
-                          onPressed: () => context.go('/scan'),
-                          child: const Text('Use camera'),
-                        ),
-                      ],
-                    ),
-                  ),
                   if (showResults) ...[
                     const SizedBox(height: 18),
                     const Text(
                       'Results',
-                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                      ),
                     ),
                     if (_searching)
                       const Padding(
@@ -205,7 +184,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     else if (_results.isEmpty)
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 16),
-                        child: Text('No species matched that name in the live catalogue.'),
+                        child: Text(
+                          'No species matched that name in the live catalogue.',
+                        ),
                       )
                     else
                       ..._results.map(
@@ -214,9 +195,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
                           leading: SizedBox(
                             width: 48,
                             height: 48,
-                            child: NetworkFishImage(
-                              url: item.imageUrl,
+                            child: CatalogueFishArt(
+                              fishId: item.fishId,
+                              networkUrl: item.imageUrl,
+                              width: 48,
+                              height: 48,
                               borderRadius: 10,
+                              fit: BoxFit.cover,
                             ),
                           ),
                           title: Text(item.shortName),
@@ -231,7 +216,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     const SizedBox(height: 18),
                     const Text(
                       'Catalogue',
-                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                      ),
                     ),
                     const SizedBox(height: 10),
                     SizedBox(
@@ -246,20 +234,26 @@ class _ExploreScreenState extends State<ExploreScreen> {
                             width: 100,
                             child: SoftCard(
                               padding: const EdgeInsets.all(8),
-                              onTap: () => context.push('/seafood/${item.fishId}'),
+                              onTap: () =>
+                                  context.push('/seafood/${item.fishId}'),
                               child: Column(
                                 children: [
-                                  NetworkFishImage(
-                                    url: item.imageUrl,
+                                  CatalogueFishArt(
+                                    fishId: item.fishId,
+                                    networkUrl: item.imageUrl,
+                                    width: 84,
                                     height: 64,
                                     borderRadius: 12,
+                                    fit: BoxFit.cover,
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
                                     item.shortName,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontWeight: FontWeight.w800),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -283,11 +277,15 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                   TextSpan(text: 'Are you looking for '),
                                   TextSpan(
                                     text: 'Kembung',
-                                    style: TextStyle(fontWeight: FontWeight.w800),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                    ),
                                   ),
                                   TextSpan(
                                     text: ' (Rastrelliger kanagurta)?',
-                                    style: TextStyle(fontStyle: FontStyle.italic),
+                                    style: TextStyle(
+                                      fontStyle: FontStyle.italic,
+                                    ),
                                   ),
                                 ],
                               ),

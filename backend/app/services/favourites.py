@@ -25,8 +25,16 @@ async def list_favourites(
         .options(seafood_service._assessment_loader())
         .order_by(UserFavourite.created_at.desc(), SeafoodItem.code)
     )
-    items = list(await session.scalars(stmt))
-    return [seafood_service.to_summary(item) for item in items]
+    items = list((await session.scalars(stmt)).unique())
+    seen: set[str] = set()
+    out: list[SeafoodSummaryOut] = []
+    for item in items:
+        code = item.code.upper()
+        if code in seen:
+            continue
+        seen.add(code)
+        out.append(seafood_service.to_summary(item))
+    return out
 
 
 async def add_favourite(
@@ -36,23 +44,22 @@ async def add_favourite(
     if item is None:
         raise FavouriteNotFound(f"Seafood item {fish_id!r} was not found.")
 
+    summary = seafood_service.to_summary(item)
     existing = await session.get(UserFavourite, (user.id, item.seafood_item_id))
     if existing is None:
         session.add(
             UserFavourite(app_user_id=user.id, seafood_item_id=item.seafood_item_id)
         )
         await session.commit()
-
-    # Reload with WWF so the card matches /seafood.
-    item = await seafood_service.get_seafood_by_id(session, item.code)
-    assert item is not None
-    return seafood_service.to_summary(item)
+    return summary
 
 
 async def remove_favourite(
     session: AsyncSession, user: AppUser, fish_id: str
 ) -> None:
-    item = await seafood_service.get_seafood_by_id(session, fish_id)
+    item = await seafood_service.get_seafood_by_id(
+        session, fish_id, relations=False
+    )
     if item is None:
         raise FavouriteNotFound(f"Seafood item {fish_id!r} was not found.")
 

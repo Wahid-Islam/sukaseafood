@@ -143,28 +143,56 @@ def test_unknown_species_is_404(client):
 
 def test_rated_species_reports_its_wwf_rating(client):
     body = client.get("/api/v1/seafood/SF001").json()
-    assert body["sustainability"]["classification"] == "GOOD CHOICE"
+    assert body["sustainability"]["classification"] == "REDUCE"
     assert body["sustainability"]["verified"] is True
+    why = body["sustainability"]["why_it_matters"]
+    assert why.startswith("WWF rates Malaysian Kembung")
+    assert "Choosing better-rated seafood keeps pressure off" not in why
 
 
 def test_unrated_species_is_undetermined_not_guessed(client):
-    """SF005 has no wwf_assessment row on purpose.
+    """SF013 has no wwf_assessment row on purpose.
 
-    This is the single most important behaviour in the sustainability epic:
-    a missing assessment must surface as UNDETERMINED, never as a default
-    rating that a shopper would read as approval.
+    A missing assessment must surface as UNDETERMINED, never as a default rating.
     """
-    body = client.get("/api/v1/seafood/SF005").json()
+    body = client.get("/api/v1/seafood/SF013").json()
     assert body["sustainability"]["classification"] == "UNDETERMINED"
     assert body["sustainability"]["verified"] is False
+    assert body["sustainability"]["assessments"] == []
+
+
+def test_tenggiri_exposes_both_wwf_gear_ratings(client):
+    """WWF rates Tenggiri Reduce (hook-and-line) and Avoid (gillnet)."""
+    body = client.get("/api/v1/seafood/SF012").json()
+    sustain = body["sustainability"]
+    assert sustain["verified"] is True
+    assert sustain["explanation"] == "Rating varies by catch method."
+    methods = {
+        row["production_method_code"]: row["classification"]
+        for row in sustain["assessments"]
+    }
+    assert methods["HOOK_AND_LINE"] == "REDUCE"
+    assert methods["GILLNET"] == "AVOID"
+    listed = client.get("/api/v1/seafood").json()
+    tenggiri = next(row for row in listed if row["fish_id"] == "SF012")
+    assert tenggiri["classification"] == "UNDETERMINED"
 
 
 def test_price_without_mapping_is_not_invented(client):
-    """No PriceCatcher mapping is loaded yet, so no price may be reported."""
+    """Observed prices are seeded from PriceCatcher; unmapped species stay empty.
+
+    SF001 is mapped. If the observed-price seed is present the status is
+    Observed; if CI applied schema without that file, Insufficient data remains
+    valid. A number must never appear unless quality_status is DISPLAYABLE.
+    """
     body = client.get("/api/v1/seafood/SF001/price").json()
-    assert body["latest_price_rm_per_kg"] is None
-    assert body["status"] in {"No PriceCatcher mapping", "Insufficient data"}
-    assert body["history"] == []
+    if body["status"] == "Observed":
+        assert body["latest_price_rm_per_kg"] is not None
+        assert body["latest_price_rm_per_kg"] > 0
+    else:
+        assert body["latest_price_rm_per_kg"] is None
+        assert body["status"] in {"No PriceCatcher mapping", "Insufficient data"}
+        assert body["history"] == []
 
 
 def test_cooking_recommendations_accept_aliases(client):
@@ -474,7 +502,17 @@ def test_fresh_account_has_empty_favourites(client):
     )
     assert added.status_code == 201
     assert added.json()["fish_id"] == "SF006"
-    assert client.get("/api/v1/me/favourites", headers=headers).json()[0]["fish_id"] == "SF006"
+    again = client.post(
+        "/api/v1/me/favourites",
+        headers=headers,
+        json={"fish_id": "SF006"},
+    )
+    assert again.status_code == 201
+    listed_ids = [
+        row["fish_id"]
+        for row in client.get("/api/v1/me/favourites", headers=headers).json()
+    ]
+    assert listed_ids == ["SF006"]
 
     removed = client.delete("/api/v1/me/favourites/SF006", headers=headers)
     assert removed.status_code == 204

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -9,16 +11,18 @@ import 'data/catalog/catalog_controller.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final AuthController authController = AuthController();
-  await authController.bootstrap();
-  final CatalogController catalogController =
-      CatalogController(auth: authController);
-  await catalogController.bootstrap();
+  await authController.restoreSession();
+  final CatalogController catalogController = CatalogController(
+    auth: authController,
+  );
   runApp(
     SukaSeafoodApp(
       authController: authController,
       catalogController: catalogController,
     ),
   );
+  unawaited(authController.refreshProfile());
+  unawaited(catalogController.bootstrap());
 }
 
 class SukaSeafoodApp extends StatelessWidget {

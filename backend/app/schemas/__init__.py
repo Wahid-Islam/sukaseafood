@@ -16,6 +16,18 @@ class AliasOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class MethodRatingOut(BaseModel):
+    """One WWF rating for one catch or production method."""
+
+    classification: str
+    production_method: str
+    production_method_code: str
+    origin: str
+    explanation: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class SustainabilityOut(BaseModel):
     """WWF sustainability payload."""
 
@@ -27,6 +39,7 @@ class SustainabilityOut(BaseModel):
     source_name: str
     source_url: str
     verified: bool
+    assessments: list[MethodRatingOut] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -3,7 +3,7 @@
 Production monorepo for the SukaSeafood mobile product — point-of-purchase decision support for sustainable Malaysian seafood.
 
 ```
-Search / Identify → Confirm → Sustainability → Price & Supply → Cooking → Choose
+Search / Identify → Confirm → Sustainability → Price → Cooking → Choose
 ```
 
 ## Repository structure
@@ -80,6 +80,22 @@ flutter run
 
 Android emulator → host API: `http://10.0.2.2:8000/api/v1`  
 (override with `--dart-define=API_BASE_URL=...`)
+
+## Live deployments
+
+| Track | Web | API | Database |
+| --- | --- | --- | --- |
+| **Iteration 1 freeze** | https://sukaseafood-i1.web.app | `sukaseafood-api-i1` | `sukaseafood-i1-database` |
+| **Working (Iteration 2+)** | https://sukaseafood-654b7.web.app | `sukaseafood-api` | `sukaseafood-654b7-database` |
+
+Iteration 2 work goes only to the working row. Do not deploy to Hosting target `i1` or Cloud Run service `sukaseafood-api-i1`.
+
+```bash
+cd frontend && flutter build web --release
+# from repo root — working site only:
+npx -y firebase-tools@latest deploy --only hosting:live --project sukaseafood-654b7
+gcloud run deploy sukaseafood-api --source=. --region=asia-southeast1 --project=sukaseafood-654b7
+```
 
 ## Iteration 1 scope
 

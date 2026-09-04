@@ -37,9 +37,9 @@ class _LoginScreenState extends State<LoginScreen> {
     if (ok) {
       context.go('/home');
     } else if (auth.error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(auth.error!)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(auth.error!)));
     }
   }
 
@@ -61,22 +61,22 @@ class _LoginScreenState extends State<LoginScreen> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.waves, color: AppColors.teal),
+                      const BrandLogo(size: 36),
                       const SizedBox(width: 8),
                       Text(
                         'SukaSeafood',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              color: Colors.white,
-                            ),
+                        style: Theme.of(
+                          context,
+                        ).textTheme.titleLarge?.copyWith(color: Colors.white),
                       ),
                     ],
                   ),
                   const Spacer(),
                   Text(
                     'Welcome back',
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          color: Colors.white,
-                        ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.headlineMedium?.copyWith(color: Colors.white),
                   ),
                   const SizedBox(height: 6),
                   Text(
@@ -166,8 +166,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 12),
                       TextButton(
-                        onPressed:
-                            busy ? null : () => context.go('/onboarding'),
+                        onPressed: busy
+                            ? null
+                            : () => context.go('/onboarding'),
                         child: const Text('New here? Create an account'),
                       ),
                     ],

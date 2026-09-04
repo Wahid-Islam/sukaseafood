@@ -50,6 +50,33 @@ class SeafoodAlias {
   }
 }
 
+class MethodRating {
+  const MethodRating({
+    required this.classification,
+    required this.productionMethod,
+    required this.productionMethodCode,
+    required this.origin,
+    required this.explanation,
+  });
+
+  final String classification;
+  final String productionMethod;
+  final String productionMethodCode;
+  final String origin;
+  final String explanation;
+
+  factory MethodRating.fromJson(Map<String, dynamic> json) {
+    return MethodRating(
+      classification: json['classification'] as String? ?? 'UNDETERMINED',
+      productionMethod: json['production_method'] as String? ?? '',
+      productionMethodCode:
+          json['production_method_code'] as String? ?? 'OTHER',
+      origin: json['origin'] as String? ?? '',
+      explanation: json['explanation'] as String? ?? '',
+    );
+  }
+}
+
 class SustainabilityInfo {
   const SustainabilityInfo({
     required this.classification,
@@ -60,6 +87,7 @@ class SustainabilityInfo {
     required this.sourceName,
     required this.sourceUrl,
     required this.verified,
+    this.assessments = const <MethodRating>[],
   });
 
   final String classification;
@@ -70,6 +98,24 @@ class SustainabilityInfo {
   final String sourceName;
   final String sourceUrl;
   final bool verified;
+  final List<MethodRating> assessments;
+
+  /// Method-specific WWF rows, or a single fallback from the summary fields.
+  List<MethodRating> get methodRatings {
+    if (assessments.isNotEmpty) return assessments;
+    if (!verified) return const <MethodRating>[];
+    return <MethodRating>[
+      MethodRating(
+        classification: classification,
+        productionMethod: productionMethod,
+        productionMethodCode: 'OTHER',
+        origin: origin,
+        explanation: explanation,
+      ),
+    ];
+  }
+
+  bool get ratingVaries => methodRatings.length > 1;
 
   factory SustainabilityInfo.fromJson(Map<String, dynamic> json) {
     return SustainabilityInfo(
@@ -81,6 +127,10 @@ class SustainabilityInfo {
       sourceName: json['source_name'] as String? ?? '',
       sourceUrl: json['source_url'] as String? ?? '',
       verified: json['verified'] as bool? ?? false,
+      assessments: (json['assessments'] as List<dynamic>? ?? const <dynamic>[])
+          .whereType<Map<String, dynamic>>()
+          .map(MethodRating.fromJson)
+          .toList(),
     );
   }
 }
@@ -110,26 +160,6 @@ class CookingSuitability {
   }
 }
 
-class SupplyContext {
-  const SupplyContext({
-    required this.summary,
-    required this.trendLabel,
-    required this.sourceName,
-  });
-
-  final String summary;
-  final String trendLabel;
-  final String sourceName;
-
-  factory SupplyContext.fromJson(Map<String, dynamic> json) {
-    return SupplyContext(
-      summary: json['summary'] as String? ?? '',
-      trendLabel: json['trend_label'] as String? ?? '',
-      sourceName: json['source_name'] as String? ?? '',
-    );
-  }
-}
-
 class SeafoodProfile {
   const SeafoodProfile({
     required this.fishId,
@@ -143,7 +173,6 @@ class SeafoodProfile {
     this.aliases = const <SeafoodAlias>[],
     this.sustainability,
     this.cooking = const <CookingSuitability>[],
-    this.supply,
   });
 
   final String fishId;
@@ -157,7 +186,6 @@ class SeafoodProfile {
   final List<SeafoodAlias> aliases;
   final SustainabilityInfo? sustainability;
   final List<CookingSuitability> cooking;
-  final SupplyContext? supply;
 
   String get shortName {
     final int cut = primaryCommonName.indexOf(' / ');
@@ -166,14 +194,15 @@ class SeafoodProfile {
 
   String get alsoKnownAs {
     final Iterable<String> names = aliases
-        .where((SeafoodAlias a) => a.alias.toLowerCase() != shortName.toLowerCase())
+        .where(
+          (SeafoodAlias a) => a.alias.toLowerCase() != shortName.toLowerCase(),
+        )
         .map((SeafoodAlias a) => a.alias)
         .take(4);
     return names.join(', ');
   }
 
-  String get classification =>
-      sustainability?.classification ?? 'UNDETERMINED';
+  String get classification => sustainability?.classification ?? 'UNDETERMINED';
 
   factory SeafoodProfile.fromJson(Map<String, dynamic> json) {
     return SeafoodProfile(
@@ -198,9 +227,6 @@ class SeafoodProfile {
           .whereType<Map<String, dynamic>>()
           .map(CookingSuitability.fromJson)
           .toList(),
-      supply: json['supply'] is Map<String, dynamic>
-          ? SupplyContext.fromJson(json['supply'] as Map<String, dynamic>)
-          : null,
     );
   }
 }
@@ -242,7 +268,12 @@ class PriceContext {
   final List<ObservedPricePoint> history;
   final String disclaimer;
 
-  bool get isDisplayable => latestPriceRmPerKg != null;
+  bool get isDisplayable => observedPriceRmPerKg != null;
+
+  /// Latest weekly PriceCatcher median. Prefers history so current price
+  /// and week-over-week use the same series.
+  double? get observedPriceRmPerKg =>
+      history.isNotEmpty ? history.last.priceRmPerKg : latestPriceRmPerKg;
 
   factory PriceContext.fromJson(Map<String, dynamic> json) {
     return PriceContext(

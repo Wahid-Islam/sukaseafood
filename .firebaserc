@@ -2,6 +2,17 @@
   "projects": {
     "default": "sukaseafood-654b7"
   },
-  "targets": {},
+  "targets": {
+    "sukaseafood-654b7": {
+      "hosting": {
+        "live": [
+          "sukaseafood-654b7"
+        ],
+        "i1": [
+          "sukaseafood-i1"
+        ]
+      }
+    }
+  },
   "etags": {}
 }

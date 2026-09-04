@@ -7,50 +7,170 @@
     "Schema source of truth: backend/db/schema/v3_*.sql (apply.sh).",
     "GraphQL mirror: dataconnect/schema/schema.gql (COMPATIBLE validation).",
     "",
-    "Hosting serves Flutter web and can proxy /api/** to Cloud Run FastAPI.",
-    "Deploy web: flutter build web --release (frontend/) then firebase deploy"
+    "Two Hosting sites so Iteration 2 cannot overwrite Iteration 1:",
+    "  live → https://sukaseafood-654b7.web.app  (working; deploy hosting:live)",
+    "  i1   → https://sukaseafood-i1.web.app     (frozen I1; never deploy I2 here)",
+    "Web talks to same-origin /api/v1; each site rewrites to its own Cloud Run.",
+    "Deploy web: flutter build web --release (frontend/) then firebase deploy --only hosting:live"
   ],
-  "hosting": {
-    "public": "frontend/build/web",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ],
-    "rewrites": [
-      {
-        "source": "/api/**",
-        "run": {
-          "serviceId": "sukaseafood-api",
-          "region": "asia-southeast1"
+  "hosting": [
+    {
+      "target": "live",
+      "public": "frontend/build/web",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "/api/**",
+          "run": {
+            "serviceId": "sukaseafood-api",
+            "region": "asia-southeast1"
+          }
+        },
+        {
+          "source": "**",
+          "destination": "/index.html"
         }
-      },
-      {
-        "source": "**",
-        "destination": "/index.html"
-      }
-    ],
-    "headers": [
-      {
-        "source": "**/*.@(js|css|woff2)",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "public, max-age=31536000, immutable"
+      ],
+      "headers": [
+        {
+          "source": "**/*.@(js|css|woff2)",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "public, max-age=31536000, immutable"
+            }
+          ]
+        },
+        {
+          "source": "/index.html",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        },
+        {
+          "source": "/flutter_service_worker.js",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        },
+        {
+          "source": "/flutter_bootstrap.js",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        },
+        {
+          "source": "/flutter.js",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        },
+        {
+          "source": "/main.dart.js",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "target": "i1",
+      "public": "frontend/build/web",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "/api/**",
+          "run": {
+            "serviceId": "sukaseafood-api-i1",
+            "region": "asia-southeast1"
           }
-        ]
-      },
-      {
-        "source": "/index.html",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "no-cache"
-          }
-        ]
-      }
-    ]
-  },
+        },
+        {
+          "source": "**",
+          "destination": "/index.html"
+        }
+      ],
+      "headers": [
+        {
+          "source": "**/*.@(js|css|woff2)",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "public, max-age=31536000, immutable"
+            }
+          ]
+        },
+        {
+          "source": "/index.html",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        },
+        {
+          "source": "/flutter_service_worker.js",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        },
+        {
+          "source": "/flutter_bootstrap.js",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        },
+        {
+          "source": "/flutter.js",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        },
+        {
+          "source": "/main.dart.js",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        }
+      ]
+    }
+  ],
   "storage": {
     "rules": "storage.rules"
   },

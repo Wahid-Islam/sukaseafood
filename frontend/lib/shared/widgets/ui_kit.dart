@@ -1,12 +1,26 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
+
+/// Wikimedia FilePath URLs need a User-Agent on Android. On web, custom
+/// headers force a CORS fetch that Commons does not allow, so CanvasKit
+/// falls back to the placeholder icon. HTML `<img>` tags load them instead.
+Map<String, String>? _networkImageHeaders() {
+  if (kIsWeb) return null;
+  return const <String, String>{
+    'User-Agent': 'SukaSeafood/1.0 (Flutter; educational)',
+  };
+}
+
+WebHtmlElementStrategy get _webImageStrategy =>
+    kIsWeb ? WebHtmlElementStrategy.prefer : WebHtmlElementStrategy.never;
 
 class SoftCard extends StatelessWidget {
   const SoftCard({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(16),
+    this.padding = const EdgeInsets.fromLTRB(16, 20, 16, 16),
     this.color = AppColors.card,
     this.onTap,
   });
@@ -46,34 +60,125 @@ class SoftCard extends StatelessWidget {
   }
 }
 
-class ClassificationPill extends StatelessWidget {
-  const ClassificationPill({super.key, required this.label});
+class BrandLogo extends StatelessWidget {
+  const BrandLogo({super.key, this.size = 34});
 
-  final String label;
+  static const String asset = 'assets/images/suka_logo.png';
+
+  final double size;
 
   @override
   Widget build(BuildContext context) {
-    final Color color = AppTheme.classificationColor(label);
+    return Image.asset(
+      asset,
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.medium,
+      semanticLabel: 'SukaSeafood',
+    );
+  }
+}
+
+class WwfLogo extends StatelessWidget {
+  const WwfLogo({super.key, this.height = 28});
+
+  static const String asset = 'assets/images/wwf_logo.webp';
+
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.asset(
+      asset,
+      height: height,
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.medium,
+      semanticLabel: 'WWF',
+    );
+  }
+}
+
+class ClassificationPill extends StatelessWidget {
+  const ClassificationPill({super.key, required this.label, this.caption});
+
+  final String label;
+  final String? caption;
+
+  @override
+  Widget build(BuildContext context) {
+    final String code = label.toUpperCase();
+    return CaptionedPill(
+      color: AppTheme.classificationColor(label),
+      icon: switch (code) {
+        'GOOD CHOICE' || 'BEST CHOICE' => Icons.check_circle,
+        'REDUCE' => Icons.remove_circle,
+        'AVOID' => Icons.cancel,
+        _ => Icons.help,
+      },
+      label: label,
+      caption: caption,
+    );
+  }
+}
+
+class CaptionedPill extends StatelessWidget {
+  const CaptionedPill({
+    super.key,
+    required this.color,
+    required this.icon,
+    required this.label,
+    this.caption,
+  });
+
+  final Color color;
+  final IconData icon;
+  final String label;
+  final String? caption;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool hasCaption = caption != null && caption!.isNotEmpty;
+    final Widget labelText = Text(
+      label.toUpperCase(),
+      style: TextStyle(
+        color: color,
+        fontWeight: FontWeight.w800,
+        fontSize: 11,
+        letterSpacing: 0.3,
+      ),
+    );
+    final Widget body = hasCaption
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              labelText,
+              Text(
+                caption!,
+                style: TextStyle(
+                  color: color.withValues(alpha: 0.9),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  height: 1.25,
+                ),
+              ),
+            ],
+          )
+        : labelText;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      width: hasCaption ? double.infinity : null,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(hasCaption ? 14 : 999),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: hasCaption ? MainAxisSize.max : MainAxisSize.min,
         children: [
-          Icon(Icons.check_circle, size: 14, color: color),
+          Icon(icon, size: 16, color: color),
           const SizedBox(width: 6),
-          Text(
-            label.toUpperCase(),
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.w800,
-              fontSize: 11,
-              letterSpacing: 0.3,
-            ),
-          ),
+          if (hasCaption) Expanded(child: body) else body,
         ],
       ),
     );
@@ -122,11 +227,13 @@ class NetworkFishImage extends StatelessWidget {
     required this.url,
     this.height,
     this.borderRadius = 16,
+    this.fit = BoxFit.cover,
   });
 
   final String? url;
   final double? height;
   final double borderRadius;
+  final BoxFit fit;
 
   @override
   Widget build(BuildContext context) {
@@ -148,7 +255,8 @@ class NetworkFishImage extends StatelessWidget {
         url!,
         height: height,
         width: double.infinity,
-        fit: BoxFit.cover,
+        fit: fit,
+        webHtmlElementStrategy: _webImageStrategy,
         errorBuilder: (_, _, _) => placeholder,
         loadingBuilder: (context, child, progress) {
           if (progress == null) return child;
@@ -159,9 +267,7 @@ class NetworkFishImage extends StatelessWidget {
             child: const CircularProgressIndicator(strokeWidth: 2),
           );
         },
-        headers: const <String, String>{
-          'User-Agent': 'SukaSeafood/1.0 (Flutter; educational)',
-        },
+        headers: _networkImageHeaders(),
       ),
     );
   }
@@ -173,11 +279,13 @@ class DarkHeader extends StatelessWidget {
     required this.child,
     this.height = 220,
     this.backgroundUrl,
+    this.backgroundAsset,
   });
 
   final Widget child;
   final double height;
   final String? backgroundUrl;
+  final String? backgroundAsset;
 
   @override
   Widget build(BuildContext context) {
@@ -187,14 +295,21 @@ class DarkHeader extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          if (backgroundUrl != null)
+          if (backgroundAsset != null)
+            Image.asset(
+              backgroundAsset!,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) =>
+                  const ColoredBox(color: AppColors.navy),
+            )
+          else if (backgroundUrl != null)
             Image.network(
               backgroundUrl!,
               fit: BoxFit.cover,
-              headers: const <String, String>{
-                'User-Agent': 'SukaSeafood/1.0 (Flutter; educational)',
-              },
-              errorBuilder: (_, __, ___) => const ColoredBox(color: AppColors.navy),
+              webHtmlElementStrategy: _webImageStrategy,
+              headers: _networkImageHeaders(),
+              errorBuilder: (_, __, ___) =>
+                  const ColoredBox(color: AppColors.navy),
             )
           else
             const ColoredBox(color: AppColors.navy),
@@ -213,6 +328,49 @@ class DarkHeader extends StatelessWidget {
           SafeArea(bottom: false, child: child),
         ],
       ),
+    );
+  }
+}
+
+/// Tappable (i) control. Hover tooltips are easy to miss on phones and web.
+class InfoButton extends StatelessWidget {
+  const InfoButton({super.key, required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: 'Show info',
+      visualDensity: VisualDensity.compact,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+      style: IconButton.styleFrom(
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        minimumSize: const Size(32, 32),
+        padding: EdgeInsets.zero,
+        visualDensity: VisualDensity.compact,
+      ),
+      iconSize: 16,
+      color: AppColors.muted.withValues(alpha: 0.9),
+      icon: const Icon(Icons.info_outline),
+      onPressed: () {
+        showDialog<void>(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('Info'),
+              content: Text(message),
+              actions: <Widget>[
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Close'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }

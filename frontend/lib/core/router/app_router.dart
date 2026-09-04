@@ -98,7 +98,10 @@ GoRouter createRouter(AuthController auth) {
       GoRoute(
         path: '/price/:id',
         builder: (context, state) {
-          return PriceScreen(seafoodId: state.pathParameters['id']!);
+          return PriceScreen(
+            seafoodId: state.pathParameters['id']!,
+            initialTab: state.uri.queryParameters['tab'],
+          );
         },
       ),
       GoRoute(

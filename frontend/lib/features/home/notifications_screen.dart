@@ -24,12 +24,12 @@ class NotificationsScreen extends StatelessWidget {
       route: '/price/SF001',
     ),
     _Notice(
-      title: 'Selangor landings context',
+      title: 'Open the four-week outlook',
       body:
-          'National landings are published as whole-fishery context, not a species spike. '
-          'Open Price & Supply for the live outlook.',
+          'Observed PriceCatcher prices and the modelled outlook are different series. '
+          'Open Price to compare them.',
       when: 'Today',
-      icon: Icons.tsunami,
+      icon: Icons.show_chart,
       route: '/price/SF001',
     ),
     _Notice(

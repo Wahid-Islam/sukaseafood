@@ -6,15 +6,15 @@ import '../../data/models/user_profile.dart';
 /// Auth state for go_router redirects and UI (PostgreSQL via FastAPI).
 class AuthController extends ChangeNotifier {
   AuthController({AuthService? service})
-      : _service = service ?? AuthService(),
-        _useApi = true;
+    : _service = service ?? AuthService(),
+      _useApi = true;
 
   /// Test / offline mode — no network calls.
   AuthController.forTesting({UserProfile? profile})
-      : _service = null,
-        _useApi = false,
-        _profile = profile,
-        _ready = true;
+    : _service = null,
+      _useApi = false,
+      _profile = profile,
+      _ready = true;
 
   final AuthService? _service;
   final bool _useApi;
@@ -26,7 +26,7 @@ class AuthController extends ChangeNotifier {
 
   UserProfile? get profile => _profile;
   bool get isReady => _ready;
-  bool get isSignedIn => _profile != null;
+  bool get isSignedIn => _profile != null || (_service?.hasToken ?? false);
   bool get isBusy => _busy;
   String? get error => _error;
   String get displayName => _profile?.name ?? 'Friend';
@@ -35,7 +35,11 @@ class AuthController extends ChangeNotifier {
   String get forecastLocationName =>
       _profile?.forecastLocationName ?? 'Selangor';
 
-  Future<void> bootstrap() async {
+  /// Restore a saved token from disk and mark the router ready.
+  ///
+  /// Does not wait on `/auth/me` — [refreshProfile] loads the name afterwards
+  /// so the shell can paint while Cloud SQL is still answering.
+  Future<void> restoreSession() async {
     if (!_useApi) {
       _ready = true;
       notifyListeners();
@@ -43,15 +47,27 @@ class AuthController extends ChangeNotifier {
     }
     try {
       await _service!.restoreSession();
-      if (_service.hasToken) {
-        _profile = await _service.loadCurrentUser();
-      }
     } catch (_) {
       _profile = null;
     } finally {
       _ready = true;
       notifyListeners();
     }
+  }
+
+  Future<void> refreshProfile() async {
+    if (!_useApi || !(_service?.hasToken ?? false)) return;
+    try {
+      _profile = await _service!.loadCurrentUser();
+    } catch (_) {
+      _profile = null;
+    }
+    if (hasListeners) notifyListeners();
+  }
+
+  Future<void> bootstrap() async {
+    await restoreSession();
+    await refreshProfile();
   }
 
   Future<bool> signUp({
@@ -69,17 +85,12 @@ class AuthController extends ChangeNotifier {
       return true;
     }
 
-    return _run(() => _service!.signUp(
-          name: name,
-          email: email,
-          password: password,
-        ));
+    return _run(
+      () => _service!.signUp(name: name, email: email, password: password),
+    );
   }
 
-  Future<bool> signIn({
-    required String email,
-    required String password,
-  }) async {
+  Future<bool> signIn({required String email, required String password}) async {
     if (!_useApi) {
       _profile = UserProfile(
         uid: 'test',
@@ -117,9 +128,10 @@ class AuthController extends ChangeNotifier {
       return false;
     } catch (e) {
       final String msg = e.toString();
-      if (msg.contains('SocketException') || msg.contains('ClientException')) {
-        _error =
-            'Cannot reach the API. Start the backend and check API_BASE_URL.';
+      if (msg.contains('SocketException') ||
+          msg.contains('ClientException') ||
+          msg.contains('TimeoutException')) {
+        _error = 'Cannot reach the API. Check internet, then try again.';
       } else {
         _error = msg;
       }

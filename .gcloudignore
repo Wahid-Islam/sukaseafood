@@ -1,0 +1,36 @@
+# Cloud Run `--source` upload. Keep this aligned with `.dockerignore`.
+# Without it, gcloud follows `.gitignore` and still uploads ~1 GB of
+# PriceCatcher monthly CSVs under data/open_dosm/2025 and 2026.
+
+.git
+.github
+.firebase
+.venv
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/.env
+**/.env.*
+!**/.env.example
+
+frontend
+docs
+data
+tools
+dataconnect
+**/*.md
+backend/Price Forecast
+backend/.venv
+cv/artifacts
+cv/scripts
+cv/requirements-train.txt
+frontend/.dart_tool
+frontend/build
+frontend/android/.gradle
+*.log
+*.png
+*.jpg
+*.jpeg

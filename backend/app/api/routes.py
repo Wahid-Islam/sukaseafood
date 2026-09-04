@@ -81,7 +81,7 @@ async def list_supported_seafood(
     db: AsyncSession = Depends(get_db),
 ) -> list[SeafoodSummaryOut]:
     """List every active canonical species."""
-    cached = read_cache.get("seafood:list", ttl_seconds=60)
+    cached = read_cache.get("seafood:list", ttl_seconds=300)
     if isinstance(cached, list):
         return cached
     items = await seafood_service.list_seafood(db)
@@ -115,10 +115,16 @@ async def seafood_profile(
     db: AsyncSession = Depends(get_db),
 ) -> SeafoodProfileOut:
     """Return the full decision-support profile for one fish_id."""
+    cache_key = f"seafood:profile:{fish_id.strip().upper()}"
+    cached = read_cache.get(cache_key, ttl_seconds=120)
+    if isinstance(cached, SeafoodProfileOut):
+        return cached
     item = await seafood_service.get_seafood_by_id(db, fish_id)
     if item is None:
         raise HTTPException(status_code=404, detail="Seafood not found")
-    return await seafood_service.build_profile(db, item)
+    payload = await seafood_service.build_profile(db, item)
+    read_cache.put(cache_key, payload)
+    return payload
 
 
 @router.get("/seafood/{fish_id}/price", response_model=PriceContextOut)
@@ -127,10 +133,16 @@ async def seafood_price(
     db: AsyncSession = Depends(get_db),
 ) -> PriceContextOut:
     """Observed price context (PriceCatcher-backed seed for I1)."""
+    cache_key = f"seafood:price:{fish_id.strip().upper()}"
+    cached = read_cache.get(cache_key, ttl_seconds=120)
+    if isinstance(cached, PriceContextOut):
+        return cached
     item = await seafood_service.get_seafood_by_id(db, fish_id)
     if item is None:
         raise HTTPException(status_code=404, detail="Seafood not found")
-    return await seafood_service.get_price_context(db, fish_id)
+    payload = await seafood_service.get_price_context(db, fish_id)
+    read_cache.put(cache_key, payload)
+    return payload
 
 
 @router.get("/seafood/{fish_id}/forecast", response_model=PriceForecastOut)
@@ -289,12 +301,6 @@ async def sources() -> list[SourceMetaOut]:
             role="Observed price context",
             url="https://open.dosm.gov.my/",
             license_note="Observed local prices, not national CPI average.",
-        ),
-        SourceMetaOut(
-            name="OpenDOSM Fish Landings",
-            role="Broader supply context",
-            url="https://open.dosm.gov.my/",
-            license_note="Not species-level forecasting.",
         ),
         SourceMetaOut(
             name="SukaSeafood Price Forecast Engine",

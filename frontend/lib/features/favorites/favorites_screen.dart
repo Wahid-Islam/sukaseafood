@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/catalog/catalog_controller.dart';
 import '../../data/models/seafood.dart';
+import '../../shared/widgets/catalogue_fish_art.dart';
 import '../../shared/widgets/ui_kit.dart';
 
 class FavoritesScreen extends StatelessWidget {
@@ -12,8 +13,9 @@ class FavoritesScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final List<SeafoodSummary> items =
-        context.watch<CatalogController>().favourites;
+    final List<SeafoodSummary> items = context
+        .watch<CatalogController>()
+        .favourites;
     return Scaffold(
       backgroundColor: AppColors.foam,
       appBar: AppBar(title: const Text('Favourites')),
@@ -40,9 +42,13 @@ class FavoritesScreen extends StatelessWidget {
                       SizedBox(
                         width: 72,
                         height: 72,
-                        child: NetworkFishImage(
-                          url: item.imageUrl,
+                        child: CatalogueFishArt(
+                          fishId: item.fishId,
+                          networkUrl: item.imageUrl,
+                          width: 72,
+                          height: 72,
                           borderRadius: 14,
+                          fit: BoxFit.cover,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -70,7 +76,10 @@ class FavoritesScreen extends StatelessWidget {
                         onPressed: () => context
                             .read<CatalogController>()
                             .toggleFavourite(item.fishId),
-                        icon: const Icon(Icons.favorite, color: AppColors.avoid),
+                        icon: const Icon(
+                          Icons.favorite,
+                          color: AppColors.avoid,
+                        ),
                       ),
                     ],
                   ),
