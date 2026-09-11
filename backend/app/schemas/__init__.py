@@ -184,6 +184,7 @@ class SeafoodSummaryOut(BaseModel):
     fish_id: str
     scientific_name: str
     primary_common_name: str
+    display_name_en: str
     fish_type: str
     image_url: str | None
     classification: str | None = None

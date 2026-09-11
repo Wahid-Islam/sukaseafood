@@ -118,6 +118,21 @@ def test_search_is_case_and_space_insensitive(client):
         assert any(r["fish_id"] == "SF001" for r in results), term
 
 
+def test_search_by_english_common_name(client):
+    results = client.get(
+        "/api/v1/search", params={"q": "Indian Mackerel"}
+    ).json()["results"]
+    assert results[0]["fish_id"] == "SF001"
+    assert results[0]["display_name_en"] == "Indian Mackerel"
+
+
+def test_search_by_canonical_malay_name(client):
+    results = client.get(
+        "/api/v1/search", params={"q": "Kembung / Pelaling"}
+    ).json()["results"]
+    assert any(r["fish_id"] == "SF001" for r in results)
+
+
 def test_search_by_scientific_name(client):
     results = client.get(
         "/api/v1/search", params={"q": "Oreochromis niloticus"}
@@ -290,7 +305,10 @@ def test_identify_never_returns_an_unscannable_species(client):
             files={"file": ("f.jpg", _jpeg(colour=colour), "image/jpeg")},
         ).json()
         seen.update(c["code"] for c in body["candidates"])
-    assert seen and not (seen & {"SF003", "SF004", "SF005"})
+    assert seen and not (seen & {
+        "SF003", "SF004", "SF005", "SF006", "SF009", "SF010", "SF011",
+        "SF013", "SF014",
+    })
 
 
 def test_low_confidence_is_a_200_business_state_not_an_error(client):
@@ -385,9 +403,9 @@ def test_every_scannable_species_leads_somewhere(client):
     # hard-coded, so adding a class to the model cannot leave this test stale.
     scannable = [
         i["fish_id"] for i in client.get("/api/v1/seafood").json()
-        if i["fish_id"] not in {"SF003", "SF004", "SF005", "SF013", "SF014"}
+        if i["fish_id"] in {"SF001", "SF002", "SF007", "SF008", "SF012"}
     ]
-    assert len(scannable) == 9
+    assert len(scannable) == 5
 
     for code in scannable:
         profile = client.get(f"/api/v1/seafood/{code}")
@@ -434,7 +452,7 @@ def test_class_map_matches_the_registered_model(client):
     body = client.post(
         "/api/v1/identify", files={"file": ("f.jpg", _jpeg(), "image/jpeg")}
     ).json()
-    assert body["model_version"] == "cv-i1-2026-08-30"
+    assert body["model_version"] == "cv-i1-5class-20260902T174905Z-36ac9b6a-a53adadffa11"
 
 
 def test_sources_listed(client):

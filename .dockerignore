@@ -22,6 +22,7 @@ backend/.venv
 cv/artifacts
 cv/scripts
 cv/requirements-train.txt
+cv/sukaseafood_cv_handoff/training_checkpoint.pt
 frontend/.dart_tool
 frontend/build
 frontend/android/.gradle

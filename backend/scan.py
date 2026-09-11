@@ -34,8 +34,9 @@ def find_package(explicit: str | None) -> pathlib.Path:
     """Locate the model package, preferring an explicit path."""
     here = pathlib.Path(__file__).resolve().parent
     candidates = [pathlib.Path(explicit)] if explicit else [
-        here / "cv_package",          # installed for serving
-        here.parent / "cv" / "handoff",  # straight from the CV package
+        here / "cv_package",
+        here.parent / "cv" / "sukaseafood_cv_handoff",
+        here.parent / "cv" / "handoff",
     ]
     for path in candidates:
         if (path / "model.onnx").is_file():

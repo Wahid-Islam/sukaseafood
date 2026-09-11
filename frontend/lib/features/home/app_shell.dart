@@ -4,8 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
 
-/// Bottom navigation for I1: Home / Explore / Favourites / Profile.
-/// The scanner route still exists; it is not in this chrome.
+/// Bottom navigation: Home / Explore / camera / Favourites / Profile.
 class AppShell extends StatelessWidget {
   const AppShell({super.key, required this.navigationShell});
 

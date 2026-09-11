@@ -32,10 +32,10 @@ INSERT INTO cv_model_version (
   cv_model_version_id, version_name, input_contract, metrics,
   confidence_threshold, active
 ) VALUES (
-  suka_uuid5('cv_model_version:cv-i1-2026-08-30'),
-  'cv-i1-2026-08-30',
+  suka_uuid5('cv_model_version:cv-i1-5class-20260902T174905Z-36ac9b6a-a53adadffa11'),
+  'cv-i1-5class-20260902T174905Z-36ac9b6a-a53adadffa11',
   '{
-    "backbone": "mobilenetv3_small_100",
+    "backbone": "mobilenet_v3_small",
     "image_size": 224,
     "resize_shorter_side": 256,
     "colour_order": "RGB",
@@ -63,20 +63,17 @@ INSERT INTO cv_model_version (
 }'::jsonb,
   '{
     "split": "test_clean",
-    "n": 200,
-    "accuracy": 0.78,
-    "macro_f1": 0.7171,
-    "top3_hit_rate": 0.94,
-    "backbone": "mobilenetv3_small_100",
+    "n": 82,
+    "accuracy": 0.9024,
+    "macro_f1": 0.903,
+    "top3_hit_rate": 1.0,
+    "backbone": "mobilenet_v3_small",
     "domain": "WILD",
     "caveat": "Measured on wild and museum-specimen imagery from iNaturalist, GBIF and ALA. Malaysian retail-counter performance is unmeasured and will be lower — different lighting, ice, cut fish, overlapping bodies.",
-    "weakest_classes": [
-        "SF010 Pelata",
-        "SF009 Kerisi"
-    ],
+    "weakest_classes": [],
     "labels_verified": false
 }'::jsonb,
-  0.5000,
+  0.3000,
   TRUE
 )
 ON CONFLICT (cv_model_version_id) DO UPDATE SET
@@ -97,21 +94,17 @@ INSERT INTO cv_class_mapping (
   model_class_label, model_class_index
 )
 SELECT
-  suka_uuid5('cv_class_mapping:cv-i1-2026-08-30:' || v.code),
-  suka_uuid5('cv_model_version:cv-i1-2026-08-30'),
+  suka_uuid5('cv_class_mapping:cv-i1-5class-20260902T174905Z-36ac9b6a-a53adadffa11:' || v.code),
+  suka_uuid5('cv_model_version:cv-i1-5class-20260902T174905Z-36ac9b6a-a53adadffa11'),
   s.seafood_item_id,
   v.code,
   v.idx
 FROM (VALUES
   (0, 'SF001'),   -- Kembung / Pelaling  Rastrelliger kanagurta
   (1, 'SF002'),   -- Bawal Hitam         Parastromateus niger
-  (2, 'SF006'),   -- Bawal Putih         Pampus argenteus
-  (3, 'SF007'),   -- Cencaru             Megalaspis cordyla
-  (4, 'SF008'),   -- Jenahak             Lutjanus johnii
-  (5, 'SF009'),   -- Kerisi              Nemipterus japonicus
-  (6, 'SF010'),   -- Pelata              Alepes melanoptera
-  (7, 'SF011'),   -- Selar Kuning        Selaroides leptolepis
-  (8, 'SF012')   -- Tenggiri            Scomberomorus commerson
+  (2, 'SF007'),   -- Cencaru             Megalaspis cordyla
+  (3, 'SF008'),   -- Jenahak             Lutjanus johnii
+  (4, 'SF012')   -- Tenggiri            Scomberomorus commerson
 ) AS v(idx, code)
 JOIN seafood_item s ON s.code = v.code
 ON CONFLICT (cv_class_mapping_id) DO UPDATE SET
@@ -138,13 +131,13 @@ BEGIN
   END IF;
 
   -- The JOIN above drops silently if a code is missing, so count what
-  -- actually landed rather than trusting the INSERT to have run 9 times.
+  -- actually landed rather than trusting the INSERT to have run 5 times.
   SELECT count(*) INTO n_mappings
     FROM cv_class_mapping m
     JOIN cv_model_version v USING (cv_model_version_id)
    WHERE v.active;
-  IF n_mappings <> 9 THEN
-    RAISE EXCEPTION 'active model has % class mappings, expected 9 — a seafood_item code in the class map does not exist', n_mappings;
+  IF n_mappings <> 5 THEN
+    RAISE EXCEPTION 'active model has % class mappings, expected 5 — a seafood_item code in the class map does not exist', n_mappings;
   END IF;
 
   -- Model class indices must address 0..N-1 exactly, because the adapter
@@ -152,9 +145,9 @@ BEGIN
   SELECT count(DISTINCT m.model_class_index) INTO n_joined
     FROM cv_class_mapping m
     JOIN cv_model_version v USING (cv_model_version_id)
-   WHERE v.active AND m.model_class_index BETWEEN 0 AND 8;
-  IF n_joined <> 9 THEN
-    RAISE EXCEPTION 'class indices are not a complete 0..8 set';
+   WHERE v.active AND m.model_class_index BETWEEN 0 AND 4;
+  IF n_joined <> 5 THEN
+    RAISE EXCEPTION 'class indices are not a complete 0..4 set';
   END IF;
 
   -- A mapping to a species flagged not-CV-supported means the catalogue and

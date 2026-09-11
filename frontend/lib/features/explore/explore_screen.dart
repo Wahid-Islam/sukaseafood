@@ -150,7 +150,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     controller: _controller,
                     onChanged: _onQueryChanged,
                     decoration: InputDecoration(
-                      hintText: 'Search seafood by name',
+                      hintText: 'Malay, English or scientific name',
                       filled: true,
                       fillColor: Colors.white,
                       prefixIcon: const Icon(Icons.search),
@@ -205,7 +205,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
                             ),
                           ),
                           title: Text(item.shortName),
-                          subtitle: Text(item.scientificName),
+                          subtitle: Text(
+                            item.namesSubtitle.isEmpty
+                                ? item.scientificName
+                                : item.namesSubtitle,
+                          ),
                           trailing: ClassificationPill(
                             label: item.classification ?? 'UNDETERMINED',
                           ),

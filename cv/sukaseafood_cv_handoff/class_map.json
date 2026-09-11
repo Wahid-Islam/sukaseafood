@@ -1,0 +1,55 @@
+{
+  "model_version": "cv-i1-5class-20260902T174905Z-36ac9b6a-a53adadffa11",
+  "classes": [
+    {
+      "class_index": 0,
+      "class_code": "SF001",
+      "fish_id": "SF001",
+      "seafood_item_id": "ae00df08-2bc0-5341-97e5-93b8b45d450b",
+      "label": "Kembung / Pelaling",
+      "canonical_name_ms": "Kembung / Pelaling",
+      "display_name_en": "Indian Mackerel",
+      "scientific_name": "Rastrelliger kanagurta"
+    },
+    {
+      "class_index": 1,
+      "class_code": "SF002",
+      "fish_id": "SF002",
+      "seafood_item_id": "e8e9dfc3-a60c-5a74-a29e-d390d6fa06eb",
+      "label": "Bawal Hitam",
+      "canonical_name_ms": "Bawal Hitam",
+      "display_name_en": "Black Pomfret",
+      "scientific_name": "Parastromateus niger"
+    },
+    {
+      "class_index": 2,
+      "class_code": "SF007",
+      "fish_id": "SF007",
+      "seafood_item_id": "f099ea5c-b32c-52cb-aa5c-6971a40bc33e",
+      "label": "Cencaru",
+      "canonical_name_ms": "Cencaru",
+      "display_name_en": "Hardtail Scad",
+      "scientific_name": "Megalaspis cordyla"
+    },
+    {
+      "class_index": 3,
+      "class_code": "SF008",
+      "fish_id": "SF008",
+      "seafood_item_id": "f19b73b2-62e6-52aa-9db1-94b45eccdf18",
+      "label": "Jenahak",
+      "canonical_name_ms": "Jenahak",
+      "display_name_en": "John's Snapper",
+      "scientific_name": "Lutjanus johnii"
+    },
+    {
+      "class_index": 4,
+      "class_code": "SF012",
+      "fish_id": "SF012",
+      "seafood_item_id": "1199fcbe-7fdd-5c16-a3a1-911247053b04",
+      "label": "Tenggiri",
+      "canonical_name_ms": "Tenggiri",
+      "display_name_en": "Narrow-barred Spanish Mackerel",
+      "scientific_name": "Scomberomorus commerson"
+    }
+  ]
+}

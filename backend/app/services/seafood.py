@@ -20,7 +20,7 @@ import random
 import re
 import uuid
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -205,29 +205,51 @@ async def get_seafood_by_id(
 
 
 async def search_seafood(session: AsyncSession, query: str) -> list[SeafoodItem]:
-    """Alias-first search.
+    """Search by Malay name, English name, scientific name, or alias.
 
-    Matching runs on LOWER(TRIM(alias_name)) so it uses idx_seafood_alias_search
-    rather than scanning. Exact alias matches sort first: someone typing
-    "kembung" wants Kembung at the top, not whatever else contains the string.
+    Shoppers type any of the three catalogue names. Aliases still catch
+    spellings like "ikan kembung" that are not the canonical string.
     """
     q = query.strip().lower()
     if not q:
         return []
 
-    normalised = func.lower(func.trim(SeafoodAlias.alias_name))
+    pattern = f"%{q}%"
+    alias = func.lower(func.trim(SeafoodAlias.alias_name))
+    malay = func.lower(func.trim(SeafoodItem.canonical_name_ms))
+    english = func.lower(func.trim(SeafoodItem.display_name_en))
+    scientific = func.lower(func.trim(SeafoodItem.scientific_name))
     stmt = (
-        select(SeafoodItem, func.min(func.length(SeafoodAlias.alias_name)).label("best"))
-        .join(SeafoodAlias, SeafoodAlias.seafood_item_id == SeafoodItem.seafood_item_id)
+        select(
+            SeafoodItem,
+            func.min(
+                func.least(
+                    func.abs(func.length(SeafoodItem.canonical_name_ms) - len(q)),
+                    func.abs(func.length(SeafoodItem.display_name_en) - len(q)),
+                    func.abs(func.length(SeafoodItem.scientific_name) - len(q)),
+                    func.abs(
+                        func.coalesce(func.length(SeafoodAlias.alias_name), 999)
+                        - len(q)
+                    ),
+                )
+            ).label("best"),
+        )
+        .outerjoin(
+            SeafoodAlias,
+            SeafoodAlias.seafood_item_id == SeafoodItem.seafood_item_id,
+        )
         .where(SeafoodItem.active.is_(True))
-        .where(normalised.like(f"%{q}%"))
+        .where(
+            or_(
+                malay.like(pattern),
+                english.like(pattern),
+                scientific.like(pattern),
+                alias.like(pattern),
+            )
+        )
         .options(_assessment_loader())
         .group_by(SeafoodItem.seafood_item_id)
-        .order_by(
-            # exact alias match first, then shortest matching alias
-            func.min(func.abs(func.length(SeafoodAlias.alias_name) - len(q))),
-            "best",
-        )
+        .order_by("best")
     )
     return [row[0] for row in (await session.execute(stmt)).all()]
 
@@ -322,6 +344,7 @@ def to_summary(item: SeafoodItem) -> SeafoodSummaryOut:
         fish_id=item.code,
         scientific_name=item.scientific_name,
         primary_common_name=item.canonical_name_ms,
+        display_name_en=item.display_name_en,
         fish_type=_fish_type(item),
         image_url=_image_url(item),
         classification=classification,

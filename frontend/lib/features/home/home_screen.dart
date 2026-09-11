@@ -219,7 +219,7 @@ class _SearchBar extends StatelessWidget {
               Icon(Icons.search, color: AppColors.muted),
               SizedBox(width: 8),
               Text(
-                'Search seafood by name',
+                'Malay, English or scientific name',
                 style: TextStyle(color: AppColors.muted),
               ),
             ],

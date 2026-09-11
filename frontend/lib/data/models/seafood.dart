@@ -7,6 +7,7 @@ class SeafoodSummary {
     required this.scientificName,
     required this.primaryCommonName,
     required this.fishType,
+    this.displayNameEn = '',
     this.imageUrl,
     this.classification,
   });
@@ -14,6 +15,7 @@ class SeafoodSummary {
   final String fishId;
   final String scientificName;
   final String primaryCommonName;
+  final String displayNameEn;
   final String fishType;
   final String? imageUrl;
   final String? classification;
@@ -29,10 +31,20 @@ class SeafoodSummary {
       fishId: json['fish_id'] as String? ?? '',
       scientificName: json['scientific_name'] as String? ?? '',
       primaryCommonName: json['primary_common_name'] as String? ?? '',
+      displayNameEn: json['display_name_en'] as String? ?? '',
       fishType: json['fish_type'] as String? ?? '',
       imageUrl: json['image_url'] as String?,
       classification: json['classification'] as String?,
     );
+  }
+
+  /// Malay, English and scientific names for search hits.
+  String get namesSubtitle {
+    final List<String> parts = <String>[
+      if (displayNameEn.isNotEmpty) displayNameEn,
+      if (scientificName.isNotEmpty) scientificName,
+    ];
+    return parts.join(' · ');
   }
 }
 

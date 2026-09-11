@@ -95,6 +95,7 @@ _ui_preview/
 # Training checkpoints — 6 MB each, and the ONNX export in handoff/ is what
 # actually gets served. Re-create with scripts/train.py.
 cv/artifacts/*.pt
+cv/sukaseafood_cv_handoff/training_checkpoint.pt
 
 # ImageNet initialisation weights (~52 MB). Re-fetch with:
 #   python scripts/fetch_weights.py

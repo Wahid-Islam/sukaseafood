@@ -166,12 +166,10 @@ DO $$
 DECLARE
   n_cv INT;
 BEGIN
-  -- The nine-class contract must survive this file. If either addition were
-  -- ever flipped to supports_cv = TRUE, 06's class-map guard would fail on the
-  -- next apply, and /identify would advertise a species the model cannot name.
+  -- The five-class scanner contract must survive this file.
   SELECT count(*) INTO n_cv FROM seafood_item WHERE supports_cv;
-  IF n_cv <> 9 THEN
-    RAISE EXCEPTION 'expected 9 CV-supported species after the forecast expansion, found %', n_cv;
+  IF n_cv <> 5 THEN
+    RAISE EXCEPTION 'expected 5 CV-supported species after the forecast expansion, found %', n_cv;
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM seafood_item WHERE code = 'SF013')

@@ -40,6 +40,6 @@ class AppConstants {
     'Kerapu Bintik',
   ];
 
-  /// Iteration 1: CV identify exists, but the camera is not in the chrome.
-  static const bool showScanner = false;
+  /// Iteration 2: the five-class CV scanner is in the chrome again.
+  static const bool showScanner = true;
 }

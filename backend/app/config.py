@@ -73,7 +73,7 @@ class Settings(BaseSettings):
     # default silently produced 503 MODEL_UNAVAILABLE anywhere that directory
     # had not been copied in by hand — which is every CI run.
     # Relative paths resolve against backend/; override with CV_PACKAGE_DIR.
-    cv_package_dir: str = "../cv/handoff"
+    cv_package_dir: str = "../cv/sukaseafood_cv_handoff"
     # Overrides the threshold recorded in the package. Left None, the validated
     # value from model_card.json is used; if that is null too, every response is
     # LOW_CONFIDENCE, which is the honest state for a model with no validated

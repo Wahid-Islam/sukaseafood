@@ -37,3 +37,4 @@ weights/
 # the real artifact.
 *.onnx
 !handoff/*.onnx
+!sukaseafood_cv_handoff/*.onnx

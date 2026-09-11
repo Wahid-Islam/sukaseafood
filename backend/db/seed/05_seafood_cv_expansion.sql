@@ -50,7 +50,7 @@ FROM (VALUES
   ('SF006', 'Bawal Putih', 'Silver Pomfret', 'Pampus argenteus',
    'species', 'Stromateidae', 'marine demersal',
    'The premium pomfret, consistently priced well above bawal hitam. Sold whole for steaming, and the price gap between the two bawal is one of the clearest everyday trade-offs a shopper faces.',
-   TRUE,
+   FALSE,
    'Distinct species from SF002 despite sharing the bawal name; the two are routinely compared at the counter.'),
 
   ('SF007', 'Cencaru', 'Hardtail Scad', 'Megalaspis cordyla',
@@ -68,19 +68,19 @@ FROM (VALUES
   ('SF009', 'Kerisi', 'Japanese Threadfin Bream', 'Nemipterus japonicus',
    'species', 'Nemipteridae', 'marine demersal',
    'Small pink-toned bream landed in quantity by trawlers. Inexpensive, often fried whole or turned into fish paste and keropok.',
-   TRUE,
+   FALSE,
    'Heavily trawl-caught; production method matters more than species for its sustainability rating.'),
 
   ('SF010', 'Pelata', 'Blackfin Scad', 'Alepes melanoptera',
    'species', 'Carangidae', 'marine pelagic',
    'Small silver scad sold by the heap, typically fried or made into masak lemak. Among the cheapest fish on the slab.',
-   TRUE,
+   FALSE,
    'Thinnest coverage of the nine in the image corpus; treat its scanner accuracy as provisional.'),
 
   ('SF011', 'Selar Kuning', 'Yellowstripe Scad', 'Selaroides leptolepis',
    'species', 'Carangidae', 'marine pelagic',
    'Small scad with a bright yellow lateral stripe, sold in bulk and fried whole. A everyday-cheap alternative when kembung is expensive.',
-   TRUE,
+   FALSE,
    'The yellow stripe is the strongest single visual cue in the catalogue, and the reason this class should be among the easiest to recognise.'),
 
   ('SF012', 'Tenggiri', 'Narrow-barred Spanish Mackerel', 'Scomberomorus commerson',
@@ -106,15 +106,15 @@ ON CONFLICT (seafood_item_id) DO UPDATE SET
   updated_at                   = now();
 
 -- =========================================================
--- supports_cv correction for the frozen five
+-- supports_cv correction for the five-class scanner
 -- =========================================================
--- The dataset has images for SF001 and SF002 only. The other three keep every
--- row they own — WWF assessment, cooking suitability, price mappings — and
--- simply stop claiming the scanner can find them.
+-- The Iteration 2 model recognises SF001, SF002, SF007, SF008 and SF012.
+-- Every other catalogue row stays searchable; the scanner must not name them.
 UPDATE seafood_item
-   SET supports_cv = FALSE, updated_at = now()
- WHERE code IN ('SF003', 'SF004', 'SF005')
-   AND supports_cv IS DISTINCT FROM FALSE;
+   SET supports_cv = code IN ('SF001', 'SF002', 'SF007', 'SF008', 'SF012'),
+       updated_at = now()
+ WHERE code IN ('SF001', 'SF002', 'SF003', 'SF004', 'SF005', 'SF006',
+                'SF007', 'SF008', 'SF009', 'SF010', 'SF011', 'SF012');
 
 -- =========================================================
 -- seafood_alias — search must reach the new species
@@ -202,8 +202,8 @@ BEGIN
   END IF;
 
   SELECT count(*) INTO n_cv FROM seafood_item WHERE supports_cv;
-  IF n_cv <> 9 THEN
-    RAISE EXCEPTION 'expected 9 CV-supported species, found % — supports_cv must match the trained class map', n_cv;
+  IF n_cv <> 5 THEN
+    RAISE EXCEPTION 'expected 5 CV-supported species, found % — supports_cv must match the trained class map', n_cv;
   END IF;
 END $$;
 

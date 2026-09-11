@@ -98,6 +98,7 @@ SELECT
   v.alias_name, v.language_code, v.alias_type::seafood_alias_type_enum, v.verified
 FROM (VALUES
   -- SF001 Kembung
+  ('SF001', 'Kembung / Pelaling',      'ms', 'MALAY',          TRUE),
   ('SF001', 'Kembung',                 'ms', 'MALAY',          TRUE),
   ('SF001', 'Ikan Kembung',            'ms', 'MALAY',          TRUE),
   ('SF001', 'Pelaling',                'ms', 'MALAY',          TRUE),

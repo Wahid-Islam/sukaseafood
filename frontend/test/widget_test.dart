@@ -42,14 +42,13 @@ void main() {
     expect(find.textContaining('Amir', findRichText: true), findsWidgets);
     expect(find.text('HIGHLIGHTED FISH OF THE WEEK'), findsOneWidget);
     expect(find.text('Tenggiri'), findsOneWidget);
-    expect(find.text('Search seafood by name'), findsWidgets);
+    expect(find.text('Malay, English or scientific name'), findsWidgets);
     expect(find.text('YOUR FAVOURITES'), findsOneWidget);
     expect(
       find.textContaining('Better choices today, healthier oceans tomorrow.'),
       findsOneWidget,
     );
-    expect(find.byIcon(Icons.photo_camera_outlined), findsNothing);
-    expect(find.text('Use camera'), findsNothing);
+    expect(find.byIcon(Icons.photo_camera_outlined), findsOneWidget);
 
     await tester.tap(find.byTooltip('Price and landing alerts'));
     await tester.pump();

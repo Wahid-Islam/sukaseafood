@@ -5,7 +5,7 @@ FROM python:3.12-slim-bookworm
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PORT=8080 \
-    CV_PACKAGE_DIR=/app/cv/handoff
+    CV_PACKAGE_DIR=/app/cv/sukaseafood_cv_handoff
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libgomp1 \
@@ -18,7 +18,7 @@ RUN pip install --no-cache-dir -r /app/backend/requirements.txt
 
 COPY backend/ /app/backend/
 COPY cv/sukacv /app/cv/sukacv
-COPY cv/handoff /app/cv/handoff
+COPY cv/sukaseafood_cv_handoff /app/cv/sukaseafood_cv_handoff
 
 WORKDIR /app/backend
 
