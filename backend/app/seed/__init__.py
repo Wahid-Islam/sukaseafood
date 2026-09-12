@@ -52,6 +52,7 @@ async def apply_schema(engine: AsyncEngine | None = None) -> None:
         "v3_forecast_contract.sql",
         "i1_app_user.sql",
         "v3_user_prefs.sql",
+        "v3_biodiversity.sql",
     ):
         path = SCHEMA_DIR / name
         logger.info("Applying schema file %s", path.name)

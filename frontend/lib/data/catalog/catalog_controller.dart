@@ -21,12 +21,15 @@ class CatalogController extends ChangeNotifier {
   CatalogController.forTesting({
     List<SeafoodSummary> items = const <SeafoodSummary>[],
     List<SeafoodSummary> favourites = const <SeafoodSummary>[],
+    Map<String, SeafoodProfile> profiles = const <String, SeafoodProfile>{},
   }) : _auth = null,
        _client = null,
        _useApi = false,
        _items = _uniqueById(items),
        _favourites = _uniqueById(favourites),
-       _ready = true;
+       _ready = true {
+    _profiles.addAll(profiles);
+  }
 
   final AuthController? _auth;
   final ApiClient? _client;
@@ -121,6 +124,7 @@ class CatalogController extends ChangeNotifier {
           .where(
             (SeafoodSummary e) =>
                 e.primaryCommonName.toLowerCase().contains(q) ||
+                e.displayNameEn.toLowerCase().contains(q) ||
                 e.scientificName.toLowerCase().contains(q) ||
                 e.fishId.toLowerCase().contains(q),
           )
@@ -134,14 +138,14 @@ class CatalogController extends ChangeNotifier {
   }
 
   Future<SeafoodProfile> profile(String fishId) {
+    final String key = fishId.toUpperCase();
+    final SeafoodProfile? cached = _profiles[key];
+    if (cached != null) return Future<SeafoodProfile>.value(cached);
     if (!_useApi) {
       return Future<SeafoodProfile>.error(
         ApiException('Catalogue is in test mode.'),
       );
     }
-    final String key = fishId.toUpperCase();
-    final SeafoodProfile? cached = _profiles[key];
-    if (cached != null) return Future<SeafoodProfile>.value(cached);
     return _profileInflight.putIfAbsent(key, () async {
       try {
         final SeafoodProfile loaded = await _client!.profile(fishId);

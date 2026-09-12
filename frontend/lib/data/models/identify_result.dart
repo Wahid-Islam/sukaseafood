@@ -72,12 +72,15 @@ class IdentifyResult {
       status: json['status'] as String? ?? 'LOW_CONFIDENCE',
       modelVersion: json['model_version'] as String? ?? 'unknown',
       confirmationRequired: json['confirmation_required'] as bool? ?? true,
-      candidates: raw
-          .whereType<Map<String, dynamic>>()
-          .map(IdentifyCandidate.fromJson)
-          .toList()
-        ..sort((IdentifyCandidate a, IdentifyCandidate b) =>
-            a.rank.compareTo(b.rank)),
+      candidates:
+          raw
+              .whereType<Map<String, dynamic>>()
+              .map(IdentifyCandidate.fromJson)
+              .toList()
+            ..sort(
+              (IdentifyCandidate a, IdentifyCandidate b) =>
+                  a.rank.compareTo(b.rank),
+            ),
     );
   }
 }

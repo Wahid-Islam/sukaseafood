@@ -3,22 +3,25 @@ import 'package:sukaseafood/data/mock/mock_catalog.dart';
 import 'package:sukaseafood/data/models/price_context.dart';
 
 void main() {
-  test('insufficient PriceCatcher data is not treated as a displayable price', () {
-    final PriceContext context = PriceContext.fromJson(<String, dynamic>{
-      'fish_id': 'SF001',
-      'latest_price_rm_per_kg': null,
-      'status': 'Insufficient data',
-      'change_vs_recent_pct': null,
-      'history': <dynamic>[],
-      'disclaimer': 'Observed price context from OpenDOSM PriceCatcher.',
-    });
+  test(
+    'insufficient PriceCatcher data is not treated as a displayable price',
+    () {
+      final PriceContext context = PriceContext.fromJson(<String, dynamic>{
+        'fish_id': 'SF001',
+        'latest_price_rm_per_kg': null,
+        'status': 'Insufficient data',
+        'change_vs_recent_pct': null,
+        'history': <dynamic>[],
+        'disclaimer': 'Observed price context from OpenDOSM PriceCatcher.',
+      });
 
-    expect(context.hasDisplayablePrice, isFalse);
-    expect(context.hasHistory, isFalse);
-    expect(context.historyLowest, isNull);
-    expect(context.historyAverage, isNull);
-    expect(context.historyHighest, isNull);
-  });
+      expect(context.hasDisplayablePrice, isFalse);
+      expect(context.hasHistory, isFalse);
+      expect(context.historyLowest, isNull);
+      expect(context.historyAverage, isNull);
+      expect(context.historyHighest, isNull);
+    },
+  );
 
   test('a null latest price is never filled from history or a default', () {
     final PriceContext context = PriceContext.fromJson(<String, dynamic>{

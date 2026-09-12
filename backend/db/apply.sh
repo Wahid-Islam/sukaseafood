@@ -31,6 +31,7 @@ run "$DIR/schema/v3_functions_indexes.sql"
 run "$DIR/schema/v3_forecast_contract.sql"
 run "$DIR/schema/i1_app_user.sql"
 run "$DIR/schema/v3_user_prefs.sql"
+run "$DIR/schema/v3_biodiversity.sql"
 
 if [ "$SCHEMA_ONLY" -eq 0 ]; then
   for f in "$DIR"/seed/*.sql; do

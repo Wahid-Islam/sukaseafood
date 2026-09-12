@@ -178,6 +178,60 @@ class CookingSuitabilityOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class OccurrenceOut(BaseModel):
+    """One OBIS observation used on the distribution map."""
+
+    latitude: float
+    longitude: float
+    country: str | None = None
+    locality: str | None = None
+    event_date: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BiodiversitySourceOut(BaseModel):
+    """Whether a cited biodiversity publisher has usable rows on file."""
+
+    key: str
+    name: str
+    available: bool
+    url: str = ""
+    unavailable_reason: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BiodiversityOut(BaseModel):
+    """Retrieved FishBase / OBIS / IUCN facts, plus catalogue taxonomy.
+
+    Missing fields stay unavailable. MyBIS national status and Reef Check
+    survey metrics are never invented.
+    """
+
+    family: str | None = None
+    habitat_group: str | None = None
+    taxonomic_level: str | None = None
+    ecosystem_note: str | None = None
+    depth_shallow_m: float | None = None
+    depth_deep_m: float | None = None
+    ecological_role: str | None = None
+    iucn_category: str | None = None
+    iucn_label: str | None = None
+    iucn_url: str | None = None
+    fishbase_url: str | None = None
+    population_trend: str | None = None
+    mybis_national_status: str | None = None
+    occurrences: list[OccurrenceOut] = Field(default_factory=list)
+    sources: list[BiodiversitySourceOut] = Field(default_factory=list)
+    available: bool
+    source_name: str
+    source_url: str
+    unavailable_reason: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class SeafoodSummaryOut(BaseModel):
     """Compact seafood card for search / lists."""
 
@@ -188,6 +242,8 @@ class SeafoodSummaryOut(BaseModel):
     fish_type: str
     image_url: str | None
     classification: str | None = None
+    description: str = ""
+    suitable_methods: list[str] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -198,13 +254,16 @@ class SeafoodProfileOut(BaseModel):
     fish_id: str
     scientific_name: str
     primary_common_name: str
+    display_name_en: str = ""
     fish_type: str
+    family: str | None = None
     common_in: str
     market_availability: str
     about: str
     image_url: str | None
     aliases: list[AliasOut]
     sustainability: SustainabilityOut | None
+    biodiversity: BiodiversityOut | None = None
     cooking: list[CookingSuitabilityOut]
     supply: SupplyContextOut | None = None
 

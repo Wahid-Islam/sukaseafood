@@ -59,9 +59,8 @@ class PriceContext {
   bool get hasHistory => history.isNotEmpty;
 
   /// Weekly-median min. Not a premise-level statistic.
-  double? get historyLowest => _reduceHistory(
-        (double a, double b) => a < b ? a : b,
-      );
+  double? get historyLowest =>
+      _reduceHistory((double a, double b) => a < b ? a : b);
 
   /// Arithmetic mean of returned weekly medians.
   double? get historyAverage {
@@ -74,15 +73,12 @@ class PriceContext {
   }
 
   /// Weekly-median max. Not a premise-level statistic.
-  double? get historyHighest => _reduceHistory(
-        (double a, double b) => a > b ? a : b,
-      );
+  double? get historyHighest =>
+      _reduceHistory((double a, double b) => a > b ? a : b);
 
   double? _reduceHistory(double Function(double, double) pick) {
     if (history.isEmpty) return null;
-    return history
-        .map((ObservedPricePoint p) => p.priceRmPerKg)
-        .reduce(pick);
+    return history.map((ObservedPricePoint p) => p.priceRmPerKg).reduce(pick);
   }
 
   factory PriceContext.fromJson(Map<String, dynamic> json) {
@@ -97,7 +93,8 @@ class PriceContext {
           .whereType<Map<String, dynamic>>()
           .map(ObservedPricePoint.fromJson)
           .toList(),
-      disclaimer: json['disclaimer'] as String? ??
+      disclaimer:
+          json['disclaimer'] as String? ??
           'Observed price context from OpenDOSM PriceCatcher — '
               'not a nationally representative average.',
     );

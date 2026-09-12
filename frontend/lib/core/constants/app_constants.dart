@@ -11,6 +11,12 @@ class AppConstants {
     'API_BASE_URL',
   );
 
+  /// CARTO raster basemap key. Pass at build time with
+  /// `--dart-define=CARTO_BASEMAPS_KEY=...` — do not commit the key.
+  static const String cartoBasemapsKey = String.fromEnvironment(
+    'CARTO_BASEMAPS_KEY',
+  );
+
   /// Production API via Firebase Hosting rewrite to Cloud Run.
   ///
   /// On web the default is same-origin `/api/v1`, so the Iteration 1 freeze
@@ -32,12 +38,12 @@ class AppConstants {
     'steaming',
   ];
 
-  static const List<String> supportedSpeciesLabels = [
-    'Kembung / Pelaling',
-    'Bawal Hitam',
-    'Ikan Merah',
-    'Tilapia',
-    'Kerapu Bintik',
+  static const List<String> scannerSpeciesLabels = [
+    'Kembung / Pelaling (Indian Mackerel)',
+    'Bawal Hitam (Black Pomfret)',
+    'Cencaru (Hardtail Scad)',
+    'Jenahak (John\'s Snapper)',
+    'Tenggiri (Spanish Mackerel)',
   ];
 
   /// Iteration 2: the five-class CV scanner is in the chrome again.

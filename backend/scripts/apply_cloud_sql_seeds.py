@@ -14,16 +14,23 @@ import subprocess
 import sys
 from pathlib import Path
 
+from datetime import datetime, timedelta
+
+from google.auth.credentials import Credentials
 from google.cloud.sql.connector import Connector, IPTypes
-from google.oauth2.credentials import Credentials
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.pool import NullPool
 
-SEED_DIR = Path(__file__).resolve().parents[1] / "db" / "seed"
+DB_DIR = Path(__file__).resolve().parents[1] / "db"
+SEED_DIR = DB_DIR / "seed"
 INSTANCE = "sukaseafood-654b7:us-east4:sukaseafood-654b7-instance"
 DB_USER = "mdwahidislamarefin@gmail.com"
 DB_NAME = "sukaseafood-654b7-database"
-FILES = ("11_wwf_sos_2022.sql", "12_observed_prices.sql")
+FILES = (
+    (DB_DIR / "schema" / "v3_biodiversity.sql"),
+    (SEED_DIR / "14_tongkol.sql"),
+    (SEED_DIR / "15_biodiversity.sql"),
+)
 
 
 def _access_token() -> str:
@@ -37,6 +44,22 @@ def _access_token() -> str:
     ).strip()
 
 
+class _GcloudCredentials(Credentials):
+    """User gcloud token that can be re-minted when the connector downscopes."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.refresh(None)
+
+    def refresh(self, request) -> None:  # noqa: ARG002
+        self.token = _access_token()
+        self.expiry = datetime.utcnow() + timedelta(minutes=45)
+
+    def with_scopes(self, scopes, default_scopes=None):  # noqa: ARG002
+        copy = _GcloudCredentials()
+        return copy
+
+
 async def _execute_file(engine, path: Path) -> None:
     sql = path.read_text(encoding="utf-8")
     async with engine.begin() as conn:
@@ -45,12 +68,12 @@ async def _execute_file(engine, path: Path) -> None:
 
 
 async def main() -> int:
-    missing = [name for name in FILES if not (SEED_DIR / name).is_file()]
+    missing = [str(path) for path in FILES if not path.is_file()]
     if missing:
         print("missing seed files:", ", ".join(missing), file=sys.stderr)
         return 1
 
-    creds = Credentials(token=_access_token())
+    creds = _GcloudCredentials()
     loop = asyncio.get_running_loop()
     connector = Connector(loop=loop, credentials=creds)
 
@@ -70,11 +93,10 @@ async def main() -> int:
         poolclass=NullPool,
     )
     try:
-        for name in FILES:
-            path = SEED_DIR / name
-            print(f"applying {name}", flush=True)
+        for path in FILES:
+            print(f"applying {path.name}", flush=True)
             await _execute_file(engine, path)
-            print(f"ok {name}", flush=True)
+            print(f"ok {path.name}", flush=True)
     finally:
         await engine.dispose()
         await connector.close_async()

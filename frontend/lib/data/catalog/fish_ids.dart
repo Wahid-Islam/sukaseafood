@@ -1,4 +1,4 @@
-/// Canonical `fish_id` values (`SF001`…`SF014`).
+/// Canonical `fish_id` values (`SF001`…`SF015`).
 ///
 /// Older screens and notifications used prototype slugs (`tenggiri`). The API
 /// only accepts the code or a UUID, so anything arriving as a slug is mapped
@@ -21,6 +21,7 @@ class FishIds {
     'tenggiri': 'SF012',
     'demuduk': 'SF013',
     'siakap': 'SF014',
+    'tongkol': 'SF015',
   };
 
   static String canonical(String id) {

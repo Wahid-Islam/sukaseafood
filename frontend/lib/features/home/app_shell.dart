@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
 
-/// Bottom navigation: Home / Explore / camera / Favourites / Profile.
+/// Bottom navigation: Home / Discover / Scan / Favourites / Profile.
 class AppShell extends StatelessWidget {
   const AppShell({super.key, required this.navigationShell});
 
@@ -22,26 +22,9 @@ class AppShell extends StatelessWidget {
     final int branch = navigationShell.currentIndex;
     return Scaffold(
       body: navigationShell,
-      floatingActionButton: AppConstants.showScanner
-          ? FloatingActionButton(
-              backgroundColor: AppColors.teal,
-              foregroundColor: AppColors.navy,
-              elevation: 6,
-              shape: const CircleBorder(),
-              onPressed: () => _go(2),
-              child: const Icon(Icons.photo_camera_outlined, size: 28),
-            )
-          : null,
-      floatingActionButtonLocation: AppConstants.showScanner
-          ? FloatingActionButtonLocation.centerDocked
-          : null,
       bottomNavigationBar: BottomAppBar(
-        shape: AppConstants.showScanner
-            ? const CircularNotchedRectangle()
-            : null,
         color: Colors.white,
         elevation: 12,
-        notchMargin: 8,
         child: SizedBox(
           height: 64,
           child: Row(
@@ -59,12 +42,22 @@ class AppShell extends StatelessWidget {
                 child: _NavItem(
                   icon: Icons.explore_outlined,
                   activeIcon: Icons.explore,
-                  label: 'Explore',
+                  label: 'Discover',
                   selected: branch == 1,
                   onTap: () => _go(1),
                 ),
               ),
-              if (AppConstants.showScanner) const SizedBox(width: 56),
+              if (AppConstants.showScanner)
+                Expanded(
+                  child: _NavItem(
+                    icon: Icons.photo_camera_outlined,
+                    activeIcon: Icons.photo_camera,
+                    label: 'Scan',
+                    selected: branch == 2,
+                    onTap: () => _go(2),
+                    emphasized: true,
+                  ),
+                ),
               Expanded(
                 child: _NavItem(
                   icon: Icons.favorite_border,
@@ -98,6 +91,7 @@ class _NavItem extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onTap,
+    this.emphasized = false,
   });
 
   final IconData icon;
@@ -105,10 +99,13 @@ class _NavItem extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
+  final bool emphasized;
 
   @override
   Widget build(BuildContext context) {
-    final Color color = selected ? AppColors.tealDark : AppColors.muted;
+    final Color color = selected
+        ? AppColors.tealDark
+        : (emphasized ? AppColors.navy : AppColors.muted);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),

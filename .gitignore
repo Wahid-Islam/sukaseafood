@@ -4,6 +4,7 @@
 .env
 .env.*
 !.env.example
+frontend/carto_basemaps.key
 *.pem
 *.p12
 credentials*.json

@@ -22,7 +22,10 @@ async def list_favourites(
         .join(UserFavourite, UserFavourite.seafood_item_id == SeafoodItem.seafood_item_id)
         .where(UserFavourite.app_user_id == user.id)
         .where(SeafoodItem.active.is_(True))
-        .options(seafood_service._assessment_loader())
+        .options(
+            seafood_service._assessment_loader(),
+            seafood_service._cooking_loader(),
+        )
         .order_by(UserFavourite.created_at.desc(), SeafoodItem.code)
     )
     items = list((await session.scalars(stmt)).unique())

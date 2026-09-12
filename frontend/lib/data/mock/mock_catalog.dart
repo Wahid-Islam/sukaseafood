@@ -82,8 +82,7 @@ class MockCatalog {
         'Narrow-barred spanish mackerel (Scomberomorus commerson).jpg',
       ),
       classification: 'GOOD CHOICE',
-      classificationBlurb:
-          'Tenggiri is a good choice for you and our oceans.',
+      classificationBlurb: 'Tenggiri is a good choice for you and our oceans.',
       whyGood: const [
         'Abundant in local waters',
         'Supports responsible fishing',
@@ -105,8 +104,7 @@ class MockCatalog {
       fishType: 'Pelagic Fish',
       commonIn: 'Malaysia',
       marketAvailability: 'Year-round',
-      about:
-          'A versatile, mild-flavoured fish that shines in many dishes.',
+      about: 'A versatile, mild-flavoured fish that shines in many dishes.',
       imageUrl: _speciesPhoto('Atule mate palau.jpg'),
       classification: 'GOOD CHOICE',
       classificationBlurb: 'Selar is a good choice for you and our oceans.',
@@ -155,9 +153,7 @@ class MockCatalog {
       commonIn: 'Malaysia',
       marketAvailability: 'Year-round',
       about: 'Premium steamed-fish favourite — choose carefully.',
-      imageUrl: _speciesPhoto(
-        'Lutjanus_sebae_in_UShaka_Sea_World_0862a.jpg',
-      ),
+      imageUrl: _speciesPhoto('Lutjanus_sebae_in_UShaka_Sea_World_0862a.jpg'),
       classification: 'AVOID',
       classificationBlurb:
           'Many snapper fisheries face pressure — prefer better-rated swaps.',
@@ -182,11 +178,10 @@ class MockCatalog {
       commonIn: 'Malaysia',
       marketAvailability: 'Year-round',
       about: 'Affordable farmed fish — look for responsible farms / MyGAP.',
-      imageUrl: _speciesPhoto(
-        'Tilápia_ou_Sarotherodon_niloticus_2.jpg',
-      ),
+      imageUrl: _speciesPhoto('Tilápia_ou_Sarotherodon_niloticus_2.jpg'),
       classification: 'GOOD CHOICE',
-      classificationBlurb: 'Responsibly farmed tilapia is a smart everyday choice.',
+      classificationBlurb:
+          'Responsibly farmed tilapia is a smart everyday choice.',
       whyGood: const [
         'Often more sustainable than pressured wild stocks',
         'Year-round farmed availability',
@@ -210,7 +205,8 @@ class MockCatalog {
       about: 'Strong flavour, great for sambal and gulai.',
       imageUrl: _speciesPhoto('Euthynnus_affinis_Maldives.JPG'),
       classification: 'REDUCE',
-      classificationBlurb: 'Enjoy tongkol less often while better options exist.',
+      classificationBlurb:
+          'Enjoy tongkol less often while better options exist.',
       whyGood: const [
         'Check landing pressure',
         'Swap to kembung when possible',
@@ -234,7 +230,8 @@ class MockCatalog {
       about: 'Restaurant classic — steamed siakap with soy and ginger.',
       imageUrl: _speciesPhoto('Lates_calcarifer,_2014-09-19a.jpg'),
       classification: 'GOOD CHOICE',
-      classificationBlurb: 'Farmed siakap can be a responsible celebration dish.',
+      classificationBlurb:
+          'Farmed siakap can be a responsible celebration dish.',
       whyGood: const [
         'Often aquaculture-sourced',
         'Familiar cooking methods',

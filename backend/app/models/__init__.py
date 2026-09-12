@@ -172,6 +172,12 @@ class SeafoodItem(Base):
     recipe_mappings: Mapped[list[RecipeSeafoodMapping]] = relationship(
         back_populates="seafood"
     )
+    biodiversity_profile: Mapped[BiodiversityProfile | None] = relationship(
+        back_populates="seafood", uselist=False
+    )
+    biodiversity_occurrences: Mapped[list[BiodiversityOccurrence]] = relationship(
+        back_populates="seafood"
+    )
 
     def __repr__(self) -> str:  # pragma: no cover
         return f"<SeafoodItem {self.code} {self.display_name_en}>"
@@ -933,6 +939,63 @@ class RecipeCookingMethod(Base):
     recipe: Mapped[Recipe] = relationship(back_populates="cooking_methods")
 
 
+class BiodiversityProfile(Base):
+    """Retrieved FishBase / IUCN facts for one catalogue species.
+
+    Missing columns stay NULL. Absence of a row means no independent
+    biodiversity extract is on file — never invent habitat or IUCN status.
+    """
+
+    __tablename__ = "biodiversity_profile"
+
+    seafood_item_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("seafood_item.seafood_item_id"),
+        primary_key=True,
+    )
+    habitat_group: Mapped[str | None] = mapped_column(Text, nullable=True)
+    depth_shallow_m: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)
+    depth_deep_m: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)
+    ecological_role: Mapped[str | None] = mapped_column(Text, nullable=True)
+    iucn_category: Mapped[str | None] = mapped_column(Text, nullable=True)
+    iucn_label: Mapped[str | None] = mapped_column(Text, nullable=True)
+    iucn_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fishbase_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    retrieved_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    source_snapshot_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("source_snapshot.source_snapshot_id"),
+        nullable=True,
+    )
+
+    seafood: Mapped[SeafoodItem] = relationship(back_populates="biodiversity_profile")
+
+
+class BiodiversityOccurrence(Base):
+    """One OBIS occurrence point used on the observed-distribution map."""
+
+    __tablename__ = "biodiversity_occurrence"
+    __table_args__ = (
+        Index("idx_biodiversity_occurrence_item", "seafood_item_id"),
+    )
+
+    occurrence_id: Mapped[uuid.UUID] = _uuid_pk()
+    seafood_item_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("seafood_item.seafood_item_id"), nullable=False
+    )
+    latitude: Mapped[float] = mapped_column(nullable=False)
+    longitude: Mapped[float] = mapped_column(nullable=False)
+    country: Mapped[str | None] = mapped_column(Text, nullable=True)
+    locality: Mapped[str | None] = mapped_column(Text, nullable=True)
+    event_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+
+    seafood: Mapped[SeafoodItem] = relationship(
+        back_populates="biodiversity_occurrences"
+    )
+
+
 class AppUser(Base):
     """Mobile app account stored in PostgreSQL (not Firebase/Firestore)."""
 
@@ -989,6 +1052,8 @@ __all__ = [
     "AggregationRule",
     "AppUser",
     "Base",
+    "BiodiversityOccurrence",
+    "BiodiversityProfile",
     "CollectionMethod",
     "CookingMethod",
     "CookingSuitability",

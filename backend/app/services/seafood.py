@@ -20,12 +20,14 @@ import random
 import re
 import uuid
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, inspect as sa_inspect, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.config import get_settings
 from app.models import (
+    BiodiversityOccurrence,
+    BiodiversityProfile,
     CookingMethod,
     CookingSuitability,
     PricePeriodSummary,
@@ -37,10 +39,13 @@ from app.models import (
 from app.models.enums import PeriodType, PriceQuality, SustainabilityRating
 from app.schemas import (
     AliasOut,
+    BiodiversityOut,
+    BiodiversitySourceOut,
     CookingSuitabilityOut,
     IdentifyCandidate,
     IdentifyResponse,
     MethodRatingOut,
+    OccurrenceOut,
     PriceContextOut,
     PricePointOut,
     SeafoodProfileOut,
@@ -145,12 +150,19 @@ def _image_url(item: SeafoodItem) -> str | None:
 # --- reads -------------------------------------------------------------------
 
 
+def _cooking_loader():
+    """Eager-load cooking scores so catalogue cards can filter by method."""
+    return selectinload(SeafoodItem.cooking_suitability).selectinload(
+        CookingSuitability.method
+    )
+
+
 async def list_seafood(session: AsyncSession) -> list[SeafoodItem]:
     """All active supported species, with their WWF assessment preloaded."""
     stmt = (
         select(SeafoodItem)
         .where(SeafoodItem.active.is_(True))
-        .options(_assessment_loader())
+        .options(_assessment_loader(), _cooking_loader())
         .order_by(SeafoodItem.code)
     )
     return list(await session.scalars(stmt))
@@ -200,6 +212,8 @@ async def get_seafood_by_id(
             selectinload(SeafoodItem.cooking_suitability).selectinload(
                 CookingSuitability.method
             ),
+            selectinload(SeafoodItem.biodiversity_profile),
+            selectinload(SeafoodItem.biodiversity_occurrences),
         )
     return await session.scalar(stmt)
 
@@ -247,7 +261,7 @@ async def search_seafood(session: AsyncSession, query: str) -> list[SeafoodItem]
                 alias.like(pattern),
             )
         )
-        .options(_assessment_loader())
+        .options(_assessment_loader(), _cooking_loader())
         .group_by(SeafoodItem.seafood_item_id)
         .order_by("best")
     )
@@ -270,7 +284,7 @@ async def recommend_for_cooking(session: AsyncSession, method: str) -> list[Seaf
         )
         .where(CookingMethod.code == code)
         .where(SeafoodItem.active.is_(True))
-        .options(_assessment_loader())
+        .options(_assessment_loader(), _cooking_loader())
         .order_by(CookingSuitability.suitability_score.desc(), SeafoodItem.code)
     )
     return list(await session.scalars(stmt))
@@ -335,6 +349,20 @@ def _to_method_rating(assessment: WwfAssessment) -> MethodRatingOut:
     )
 
 
+def _suitable_methods(item: SeafoodItem) -> list[str]:
+    """Cooking methods with a curated score of 4 or 5."""
+    if "cooking_suitability" in sa_inspect(item).unloaded:
+        return []
+    methods: list[str] = []
+    for row in item.cooking_suitability:
+        if (row.suitability_score or 0) < 4:
+            continue
+        code = (row.method.code if row.method is not None else "").lower()
+        if code and code not in methods:
+            methods.append(code)
+    return methods
+
+
 def to_summary(item: SeafoodItem) -> SeafoodSummaryOut:
     """Compact card for search results and lists."""
     rows = _display_assessments(item)
@@ -348,6 +376,8 @@ def to_summary(item: SeafoodItem) -> SeafoodSummaryOut:
         fish_type=_fish_type(item),
         image_url=_image_url(item),
         classification=classification,
+        description=(item.description or "").strip(),
+        suitable_methods=_suitable_methods(item),
     )
 
 
@@ -416,18 +446,149 @@ def _applies_to(assessment: WwfAssessment) -> str:
     return f"Applies to {origin} {name} taken by {method}."
 
 
+def _biodiversity_sources(
+    profile: BiodiversityProfile | None,
+    occurrences: list[BiodiversityOccurrence],
+) -> list[BiodiversitySourceOut]:
+    fishbase_url = (profile.fishbase_url if profile else None) or ""
+    iucn_url = (profile.iucn_url if profile else None) or ""
+    has_habitat = bool(profile and (profile.habitat_group or profile.ecological_role))
+    has_iucn = bool(profile and profile.iucn_category)
+    return [
+        BiodiversitySourceOut(
+            key="fishbase",
+            name="FishBase",
+            available=has_habitat,
+            url=fishbase_url,
+            unavailable_reason=None
+            if has_habitat
+            else "No FishBase extract is on file for this species.",
+        ),
+        BiodiversitySourceOut(
+            key="obis",
+            name="OBIS",
+            available=bool(occurrences),
+            url="https://obis.org",
+            unavailable_reason=None
+            if occurrences
+            else "No OBIS occurrence points are on file for this species.",
+        ),
+        BiodiversitySourceOut(
+            key="iucn_redlist",
+            name="IUCN Red List of Threatened Species",
+            available=has_iucn,
+            url=iucn_url or "https://www.iucnredlist.org",
+            unavailable_reason=None
+            if has_iucn
+            else "No IUCN category is on file for this species.",
+        ),
+        BiodiversitySourceOut(
+            key="mybis",
+            name="MyBIS",
+            available=False,
+            url="https://www.mybis.gov.my",
+            unavailable_reason=(
+                "MyBIS has no public API on file. National status stays "
+                "unavailable. Local names come from the catalogue aliases."
+            ),
+        ),
+        BiodiversitySourceOut(
+            key="reef_check",
+            name="Reef Check",
+            available=False,
+            url="https://www.reefcheck.org.my",
+            unavailable_reason=(
+                "No public Reef Check extract is on file. Local survey "
+                "metrics are not invented."
+            ),
+        ),
+    ]
+
+
+def to_biodiversity(
+    item: SeafoodItem, sustainability: SustainabilityOut
+) -> BiodiversityOut:
+    """Retrieved FishBase / OBIS / IUCN facts. Missing fields stay empty."""
+    del sustainability  # WWF ratings stay on the sustainability payload.
+    family = (item.family or "").strip() or None
+    taxonomic = (item.taxonomic_level or "").strip() or None
+    profile = item.biodiversity_profile
+    occurrences = list(item.biodiversity_occurrences or [])
+    sources = _biodiversity_sources(profile, occurrences)
+
+    if profile is None:
+        return BiodiversityOut(
+            family=family,
+            habitat_group=None,
+            taxonomic_level=taxonomic,
+            ecosystem_note=None,
+            available=False,
+            source_name="SukaSeafood catalogue",
+            source_url="",
+            sources=sources,
+            unavailable_reason=(
+                "No independent biodiversity extract is on file for this "
+                "species. Habitat, depth, IUCN status and map points are "
+                "not invented."
+            ),
+        )
+
+    depth_shallow = (
+        float(profile.depth_shallow_m)
+        if profile.depth_shallow_m is not None
+        else None
+    )
+    depth_deep = (
+        float(profile.depth_deep_m) if profile.depth_deep_m is not None else None
+    )
+    role = (profile.ecological_role or "").strip() or None
+    occ_out = [
+        OccurrenceOut(
+            latitude=float(row.latitude),
+            longitude=float(row.longitude),
+            country=row.country,
+            locality=row.locality,
+            event_date=row.event_date.isoformat() if row.event_date else None,
+        )
+        for row in occurrences
+    ]
+    cited = [s.name for s in sources if s.available]
+    return BiodiversityOut(
+        family=family,
+        habitat_group=(profile.habitat_group or "").strip() or None,
+        taxonomic_level=taxonomic,
+        ecosystem_note=role,
+        depth_shallow_m=depth_shallow,
+        depth_deep_m=depth_deep,
+        ecological_role=role,
+        iucn_category=(profile.iucn_category or "").strip() or None,
+        iucn_label=(profile.iucn_label or "").strip() or None,
+        iucn_url=(profile.iucn_url or "").strip() or None,
+        fishbase_url=(profile.fishbase_url or "").strip() or None,
+        occurrences=occ_out,
+        sources=sources,
+        available=True,
+        source_name=" · ".join(cited) if cited else "FishBase · OBIS · IUCN Red List",
+        source_url=(profile.fishbase_url or "").strip(),
+        unavailable_reason=None,
+    )
+
+
 async def build_profile(session: AsyncSession, item: SeafoodItem) -> SeafoodProfileOut:
     """Full decision-journey profile for one species."""
     cooking = sorted(
         item.cooking_suitability,
         key=lambda c: (-(c.suitability_score or 0), c.method.code),
     )
+    sustainability = to_sustainability(item)
 
     return SeafoodProfileOut(
         fish_id=item.code,
         scientific_name=item.scientific_name,
         primary_common_name=item.canonical_name_ms,
+        display_name_en=item.display_name_en,
         fish_type=_fish_type(item),
+        family=(item.family or "").strip() or None,
         common_in="Malaysia",
         market_availability="Year-round",
         about=item.description or item.notes or "",
@@ -436,7 +597,8 @@ async def build_profile(session: AsyncSession, item: SeafoodItem) -> SeafoodProf
             AliasOut(alias=a.alias_name, language=a.language_code or "ms")
             for a in sorted(item.aliases, key=lambda a: a.alias_name)
         ],
-        sustainability=to_sustainability(item),
+        sustainability=sustainability,
+        biodiversity=to_biodiversity(item, sustainability),
         cooking=[
             CookingSuitabilityOut(
                 method=c.method.code.lower(),

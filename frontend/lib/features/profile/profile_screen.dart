@@ -29,9 +29,9 @@ class ProfileScreen extends StatelessWidget {
                 children: [
                   Text(
                     'Profile',
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          color: Colors.white,
-                        ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.headlineMedium?.copyWith(color: Colors.white),
                   ),
                   const SizedBox(height: 8),
                   Text(

@@ -49,10 +49,9 @@ class ApiClient {
   Uri _uri(String path, [Map<String, String>? query]) {
     final Uri base = Uri.parse('${AppConstants.apiBaseUrl}$path');
     if (query == null || query.isEmpty) return base;
-    return base.replace(queryParameters: <String, String>{
-      ...base.queryParameters,
-      ...query,
-    });
+    return base.replace(
+      queryParameters: <String, String>{...base.queryParameters, ...query},
+    );
   }
 
   /// Identify a fish from one photograph.
@@ -64,8 +63,10 @@ class ApiClient {
     required List<int> bytes,
     required String filename,
   }) async {
-    final http.MultipartRequest request =
-        http.MultipartRequest('POST', _uri('/identify'));
+    final http.MultipartRequest request = http.MultipartRequest(
+      'POST',
+      _uri('/identify'),
+    );
 
     request.files.add(
       http.MultipartFile.fromBytes(
@@ -77,10 +78,10 @@ class ApiClient {
     );
 
     try {
-      final http.StreamedResponse streamed =
-          await _client.send(request).timeout(_timeout);
-      final http.Response response =
-          await http.Response.fromStream(streamed);
+      final http.StreamedResponse streamed = await _client
+          .send(request)
+          .timeout(_timeout);
+      final http.Response response = await http.Response.fromStream(streamed);
       return IdentifyResult.fromJson(_decode(response));
     } on ApiException {
       rethrow;
@@ -99,7 +100,9 @@ class ApiClient {
           .get(
             _uri(
               '/seafood/$fishId/forecast',
-              locationId == null ? null : <String, String>{'location_id': locationId},
+              locationId == null
+                  ? null
+                  : <String, String>{'location_id': locationId},
             ),
             headers: const <String, String>{'Accept': 'application/json'},
           )
@@ -121,10 +124,9 @@ class ApiClient {
             headers: const <String, String>{'Accept': 'application/json'},
           )
           .timeout(_timeout);
-      return _decodeList(response)
-          .whereType<Map<String, dynamic>>()
-          .map(SeafoodSummary.fromJson)
-          .toList();
+      return _decodeList(
+        response,
+      ).whereType<Map<String, dynamic>>().map(SeafoodSummary.fromJson).toList();
     } on ApiException {
       rethrow;
     } catch (error) {
@@ -189,15 +191,11 @@ class ApiClient {
   Future<List<SeafoodSummary>> favourites({required String token}) async {
     try {
       final http.Response response = await _client
-          .get(
-            _uri('/me/favourites'),
-            headers: _authHeaders(token),
-          )
+          .get(_uri('/me/favourites'), headers: _authHeaders(token))
           .timeout(_timeout);
-      return _decodeList(response)
-          .whereType<Map<String, dynamic>>()
-          .map(SeafoodSummary.fromJson)
-          .toList();
+      return _decodeList(
+        response,
+      ).whereType<Map<String, dynamic>>().map(SeafoodSummary.fromJson).toList();
     } on ApiException {
       rethrow;
     } catch (error) {
@@ -234,10 +232,7 @@ class ApiClient {
   }) async {
     try {
       final http.Response response = await _client
-          .delete(
-            _uri('/me/favourites/$fishId'),
-            headers: _authHeaders(token),
-          )
+          .delete(_uri('/me/favourites/$fishId'), headers: _authHeaders(token))
           .timeout(_timeout);
       if (response.statusCode == 204) return;
       if (response.statusCode < 200 || response.statusCode >= 300) {

@@ -17,6 +17,7 @@ run "$DB_DIR/schema/v3_functions_indexes.sql"
 run "$DB_DIR/schema/v3_forecast_contract.sql"
 run "$DB_DIR/schema/i1_app_user.sql"
 run "$DB_DIR/schema/v3_user_prefs.sql"
+run "$DB_DIR/schema/v3_biodiversity.sql"
 
 for f in "$DB_DIR"/seed/*.sql; do
   [ -e "$f" ] || continue

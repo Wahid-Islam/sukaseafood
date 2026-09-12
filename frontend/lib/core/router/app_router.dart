@@ -5,6 +5,7 @@ import '../auth/auth_controller.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/auth/onboarding_screen.dart';
 import '../../features/cooking/cooking_screen.dart';
+import '../../features/explore/category_landing_screen.dart';
 import '../../features/explore/explore_screen.dart';
 import '../../features/favorites/favorites_screen.dart';
 import '../../features/home/app_shell.dart';
@@ -13,7 +14,10 @@ import '../../features/home/notifications_screen.dart';
 import '../../features/price/price_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/scan/scan_screen.dart';
+import '../../features/seafood/biodiversity_context_screen.dart';
 import '../../features/seafood/seafood_detail_screen.dart';
+import '../../features/seafood/smart_swap_screen.dart';
+import '../../features/seafood/sustainability_biodiversity_screen.dart';
 
 GoRouter createRouter(AuthController auth) {
   return GoRouter(
@@ -34,10 +38,7 @@ GoRouter createRouter(AuthController auth) {
         path: '/onboarding',
         builder: (context, state) => const OnboardingScreen(),
       ),
-      GoRoute(
-        path: '/login',
-        builder: (context, state) => const LoginScreen(),
-      ),
+      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
           return AppShell(navigationShell: navigationShell);
@@ -56,6 +57,16 @@ GoRouter createRouter(AuthController auth) {
               GoRoute(
                 path: '/explore',
                 builder: (context, state) => const ExploreScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'category/:id',
+                    builder: (context, state) {
+                      return CategoryLandingScreen(
+                        categoryId: state.pathParameters['id']!,
+                      );
+                    },
+                  ),
+                ],
               ),
             ],
           ),
@@ -93,6 +104,28 @@ GoRouter createRouter(AuthController auth) {
         path: '/seafood/:id',
         builder: (context, state) {
           return SeafoodDetailScreen(seafoodId: state.pathParameters['id']!);
+        },
+      ),
+      GoRoute(
+        path: '/seafood/:id/sustainability',
+        builder: (context, state) {
+          return SustainabilityBiodiversityScreen(
+            seafoodId: state.pathParameters['id']!,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/seafood/:id/biodiversity',
+        builder: (context, state) {
+          return BiodiversityContextScreen(
+            seafoodId: state.pathParameters['id']!,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/seafood/:id/swap',
+        builder: (context, state) {
+          return SmartSwapScreen(seafoodId: state.pathParameters['id']!);
         },
       ),
       GoRoute(

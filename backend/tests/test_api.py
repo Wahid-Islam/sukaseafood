@@ -79,26 +79,26 @@ def test_database_health(client):
     body = res.json()
     assert body["database"] == "postgresql"
     assert body["schema_applied"] is True
-    assert body["seafood_count"] == 14
+    assert body["seafood_count"] == 15
 
 
 def test_list_seafood(client):
-    """Fourteen species in the catalogue, nine of which the scanner can see.
+    """Fifteen species in the catalogue; the scanner still covers five.
 
     The catalogue is deliberately wider than the class map. SF003/4/5 have no
     usable training imagery, and SF013/14 exist so the forecast engine has a
-    canonical key. Dropping any of them to match the model would remove
-    working search, WWF, cooking or forecast data. They stay, flagged
-    supports_cv = FALSE.
+    canonical key. SF015 Tongkol is on the Popular in Malaysia list and has
+    no WWF or PriceCatcher row. They stay, flagged supports_cv = FALSE
+    unless a class map row exists.
     """
     res = client.get("/api/v1/seafood")
     assert res.status_code == 200
     items = res.json()
-    assert len(items) == 14
+    assert len(items) == 15
     assert {i["fish_id"] for i in items} == {
         "SF001", "SF002", "SF003", "SF004", "SF005", "SF006",
         "SF007", "SF008", "SF009", "SF010", "SF011", "SF012",
-        "SF013", "SF014",
+        "SF013", "SF014", "SF015",
     }
 
 
@@ -150,6 +150,42 @@ def test_profile_includes_aliases_and_cooking(client):
     assert body["cooking"][0]["suitability_score"] >= body["cooking"][-1][
         "suitability_score"
     ], "cooking methods must come back best-first"
+    assert body["display_name_en"] == "Indian Mackerel"
+    assert body["family"] == "Scombridae"
+    bio = body["biodiversity"]
+    assert bio["available"] is True
+    assert bio["habitat_group"] == "pelagic-neritic"
+    assert bio["family"] == "Scombridae"
+    assert bio["depth_shallow_m"] == 20
+    assert bio["depth_deep_m"] == 90
+    assert bio["iucn_category"] == "LC"
+    assert bio["ecological_role"]
+    assert bio["occurrences"]
+    assert any(s["key"] == "mybis" and s["available"] is False for s in bio["sources"])
+    listed = client.get("/api/v1/seafood").json()
+    kembung = next(row for row in listed if row["fish_id"] == "SF001")
+    assert "grill" in kembung["suitable_methods"]
+    assert "curry" in kembung["suitable_methods"]
+
+
+def test_family_level_species_has_no_invented_biodiversity(client):
+    """SF013 is family-level. No FishBase/IUCN species extract is on file."""
+    bio = client.get("/api/v1/seafood/SF013").json()["biodiversity"]
+    assert bio["available"] is False
+    assert bio["iucn_category"] is None
+    assert bio["occurrences"] == []
+    assert bio["unavailable_reason"]
+
+
+def test_tongkol_is_searchable_and_unrated(client):
+    results = client.get("/api/v1/search", params={"q": "Tongkol"}).json()["results"]
+    assert any(r["fish_id"] == "SF015" for r in results)
+    body = client.get("/api/v1/seafood/SF015").json()
+    assert body["scientific_name"] == "Euthynnus affinis"
+    assert body["sustainability"]["classification"] == "UNDETERMINED"
+    assert body["sustainability"]["verified"] is False
+    assert body["biodiversity"]["available"] is True
+    assert body["biodiversity"]["iucn_category"] == "LC"
 
 
 def test_unknown_species_is_404(client):
@@ -447,7 +483,7 @@ def test_class_map_matches_the_registered_model(client):
     mismatch that produces confidently wrong answers with no error anywhere.
     """
     items = client.get("/api/v1/seafood").json()
-    assert len(items) == 14
+    assert len(items) == 15
 
     body = client.post(
         "/api/v1/identify", files={"file": ("f.jpg", _jpeg(), "image/jpeg")}
@@ -470,7 +506,7 @@ def test_search_finds_bawal_putih(client):
 def test_catalogue_image_urls_are_not_storage_404s(client):
     """Every species must carry a real photo URL, not a Firebase path that 404s."""
     items = client.get("/api/v1/seafood").json()
-    assert len(items) == 14
+    assert len(items) == 15
     for item in items:
         url = item["image_url"]
         assert url, item["fish_id"]
