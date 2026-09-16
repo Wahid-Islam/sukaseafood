@@ -85,9 +85,9 @@ def test_database_health(client):
 def test_list_seafood(client):
     """Exactly the 54 WWF-listed fishes. Demuduk (SF013) is forecast-only.
 
-    The scanner still covers five classes. New WWF rows are not marked
-    scannable. SF013 stays in the database inactive so PriceCatcher and
-    the R engine keep a canonical key, but it is not a public listing.
+    The 19-class scanner covers a subset of this list. SF013 stays in the
+    database inactive so PriceCatcher and the R engine keep a canonical key,
+    but it is not a public listing.
     """
     res = client.get("/api/v1/seafood")
     assert res.status_code == 200
@@ -357,11 +357,21 @@ def test_identify_shape_and_canonical_ids(client):
         assert 0.0 <= c["confidence"] <= 1.0
 
 
-def test_identify_never_returns_an_unscannable_species(client):
-    """SF003/4/5 have no training images. The scanner must never name them.
+_I2_SCANNABLE = {
+    "SF001", "SF002", "SF003", "SF004", "SF005",
+    "SF007", "SF008", "SF012", "SF014", "SF016",
+    "SF019", "SF020", "SF037", "SF038", "SF039",
+    "SF041", "SF044", "SF046", "SF051",
+}
+_I2_MODEL_VERSION = "cv-i2-19class-convnext-tiny-20260915-original-train"
 
-    If one appeared here it would mean cv_class_mapping and the catalogue had
-    drifted apart — the silent failure the seed guards exist to prevent.
+
+def test_identify_never_returns_an_unscannable_species(client):
+    """The scanner may only name species in the 19-class map.
+
+    If a code outside that set appeared here it would mean cv_class_mapping
+    and the catalogue had drifted apart — the silent failure the seed guards
+    exist to prevent. Demuduk (SF013) is never a candidate.
     """
     seen = set()
     for colour in ((30, 30, 30), (200, 200, 200), (90, 140, 190), (170, 120, 80)):
@@ -370,10 +380,8 @@ def test_identify_never_returns_an_unscannable_species(client):
             files={"file": ("f.jpg", _jpeg(colour=colour), "image/jpeg")},
         ).json()
         seen.update(c["code"] for c in body["candidates"])
-    assert seen and not (seen & {
-        "SF003", "SF004", "SF005", "SF006", "SF009", "SF010", "SF011",
-        "SF013", "SF014",
-    })
+    assert seen and seen <= _I2_SCANNABLE
+    assert "SF013" not in seen
 
 
 def test_low_confidence_is_a_200_business_state_not_an_error(client):
@@ -468,9 +476,9 @@ def test_every_scannable_species_leads_somewhere(client):
     # hard-coded, so adding a class to the model cannot leave this test stale.
     scannable = [
         i["fish_id"] for i in client.get("/api/v1/seafood").json()
-        if i["fish_id"] in {"SF001", "SF002", "SF007", "SF008", "SF012"}
+        if i["fish_id"] in _I2_SCANNABLE
     ]
-    assert len(scannable) == 5
+    assert len(scannable) == 19
 
     for code in scannable:
         profile = client.get(f"/api/v1/seafood/{code}")
@@ -536,7 +544,7 @@ def test_class_map_matches_the_registered_model(client):
     body = client.post(
         "/api/v1/identify", files={"file": ("f.jpg", _jpeg(), "image/jpeg")}
     ).json()
-    assert body["model_version"] == "cv-i1-5class-20260902T174905Z-36ac9b6a-a53adadffa11"
+    assert body["model_version"] == _I2_MODEL_VERSION
 
 
 def test_sources_listed(client):

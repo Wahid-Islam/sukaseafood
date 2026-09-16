@@ -194,9 +194,14 @@ def main() -> int:
                           "the profile reaches the joined tables",
                           "aliases + cooking + sustainability")
 
-                    unscannable = {"SF003", "SF004", "SF005"}
-                    check(not ({c["code"] for c in cands} & unscannable),
-                          "no unscannable species returned")
+                    scannable = {
+                        "SF001", "SF002", "SF003", "SF004", "SF005",
+                        "SF007", "SF008", "SF012", "SF014", "SF016",
+                        "SF019", "SF020", "SF037", "SF038", "SF039",
+                        "SF041", "SF044", "SF046", "SF051",
+                    }
+                    check({c["code"] for c in cands} <= scannable,
+                          "only 19-class species returned")
 
         print("\n" + "=" * 60)
         failed = [c for c in checks if not c[0]]

@@ -187,21 +187,26 @@ class _ScanScreenState extends State<ScanScreen> {
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Scanner coverage'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'This scanner currently identifies only these five species. '
-                'Other seafood should be found through Search or Discovery.',
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'This scanner currently identifies these 19 species. '
+                    'Other seafood should be found through Search or Discovery.',
+                  ),
+                  const SizedBox(height: 10),
+                  for (final String name in AppConstants.scannerSpeciesLabels)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text('• $name'),
+                    ),
+                ],
               ),
-              const SizedBox(height: 10),
-              for (final String name in AppConstants.scannerSpeciesLabels)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Text('• $name'),
-                ),
-            ],
+            ),
           ),
           actions: [
             TextButton(
@@ -551,7 +556,7 @@ class _TipsCard extends StatelessWidget {
             icon: Icons.lightbulb_outline,
             title: 'Scanner coverage',
             body:
-                'This scanner currently identifies only these five species. '
+                'This scanner currently identifies 19 species. '
                 'Other seafood should be found through Search or Discovery.',
           ),
           const SizedBox(height: 12),

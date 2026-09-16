@@ -82,6 +82,11 @@ def build_sql(class_map: dict, model_card: dict) -> str:
     # the model does on images it has never influenced.
     splits = {s["split"]: s for s in metrics.get("splits", [])}
     test = splits.get("test_clean") or splits.get("test") or {}
+    # The I2 19-class card stores split metrics as named objects, not a list.
+    if not test and isinstance(metrics.get("test_clean"), dict):
+        test = metrics["test_clean"]
+    if not test and isinstance(metrics.get("test"), dict):
+        test = metrics["test"]
     per_class = test.get("per_class", [])
     weakest = [
         f"{c['class_code']} {c['label']}"
@@ -101,7 +106,7 @@ def build_sql(class_map: dict, model_card: dict) -> str:
         "caveat": (
             "Measured on wild and museum-specimen imagery from iNaturalist, GBIF "
             "and ALA. Malaysian retail-counter performance is unmeasured and will "
-            "be lower — different lighting, ice, cut fish, overlapping bodies."
+            "be lower -- different lighting, ice, cut fish, overlapping bodies."
         ),
         "weakest_classes": weakest,
         "labels_verified": False,
@@ -263,7 +268,7 @@ def main() -> int:
     sql = build_sql(class_map, model_card)
 
     if args.check:
-        current = args.out.read_text() if args.out.exists() else ""
+        current = args.out.read_text(encoding="utf-8") if args.out.exists() else ""
         if current != sql:
             print(f"STALE: {args.out} does not match {args.handoff}.", file=sys.stderr)
             print("Run: python scripts/register_model.py", file=sys.stderr)
@@ -272,7 +277,7 @@ def main() -> int:
         return 0
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(sql)
+    args.out.write_text(sql, encoding="utf-8")
     n = len(class_map["classes"])
     print(f"wrote {args.out}")
     print(f"  model   {class_map['model_version']}")

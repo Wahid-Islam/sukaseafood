@@ -1,0 +1,10 @@
+{
+  "model_version": "cv-i2-19class-convnext-tiny-20260915-original-train",
+  "architecture": "convnext_tiny",
+  "format": "onnx",
+  "filename": "model.onnx",
+  "sha256": "22c08630f0adc570de09c3ad5a5ff7ee9d6ff659813756ad9ffd0daa845e9426",
+  "size_bytes": 111423481,
+  "num_classes": 19,
+  "package_model_file": true
+}

@@ -13,10 +13,7 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.light(),
-        home: const ScanScreen(),
-      ),
+      MaterialApp(theme: AppTheme.light(), home: const ScanScreen()),
     );
     await tester.pump();
 
@@ -29,5 +26,27 @@ void main() {
     expect(find.text('Scanner coverage'), findsOneWidget);
     expect(find.text('Quick tip'), findsOneWidget);
     expect(find.text('Point at the fish on the counter'), findsOneWidget);
+    expect(find.textContaining('identifies 19 species'), findsOneWidget);
+  });
+
+  testWidgets('coverage dialog lists the 19 trained species', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(theme: AppTheme.light(), home: const ScanScreen()),
+    );
+    await tester.pump();
+
+    await tester.tap(find.byTooltip('Scanner coverage'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Alaskan Pollock'), findsOneWidget);
+    expect(find.textContaining('Tilapia'), findsWidgets);
+    expect(find.textContaining('identifies these 19 species'), findsOneWidget);
   });
 }

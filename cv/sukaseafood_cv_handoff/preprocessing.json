@@ -1,7 +1,7 @@
 {
-  "backbone": "mobilenet_v3_small",
+  "backbone": "convnext_tiny",
   "image_size": 224,
-  "resize_shorter_side": 256,
+  "resize_shorter_side": 236,
   "colour_order": "RGB",
   "scale": "0-1",
   "mean": [

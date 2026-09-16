@@ -1,55 +1,234 @@
 {
-  "model_version": "cv-i1-5class-20260902T174905Z-36ac9b6a-a53adadffa11",
+  "model_version": "cv-i2-19class-convnext-tiny-20260915-original-train",
   "classes": [
     {
       "class_index": 0,
-      "class_code": "SF001",
-      "fish_id": "SF001",
-      "seafood_item_id": "ae00df08-2bc0-5341-97e5-93b8b45d450b",
-      "label": "Kembung / Pelaling",
-      "canonical_name_ms": "Kembung / Pelaling",
-      "display_name_en": "Indian Mackerel",
-      "scientific_name": "Rastrelliger kanagurta"
+      "class_code": "SF016",
+      "fish_id": "SF016",
+      "seafood_item_id": "5666af59-5107-546c-9005-de1d06352ac5",
+      "label": "Alaskan Pollock",
+      "canonical_name_ms": "Alaskan Pollock",
+      "display_name_en": "Alaskan Pollock",
+      "scientific_name": "Gadus chalcogrammus",
+      "wwf_row_id": "6",
+      "database_mapping_status": "linked"
     },
     {
       "class_index": 1,
+      "class_code": "SF019",
+      "fish_id": "SF019",
+      "seafood_item_id": "0914216f-909a-5437-a7e3-6584c9979968",
+      "label": "Atlantic Cod",
+      "canonical_name_ms": "Atlantic Cod",
+      "display_name_en": "Atlantic Cod",
+      "scientific_name": "Gadus Morhua",
+      "wwf_row_id": "9",
+      "database_mapping_status": "linked"
+    },
+    {
+      "class_index": 2,
+      "class_code": "SF020",
+      "fish_id": "SF020",
+      "seafood_item_id": "2c3de8b0-18cd-5bdc-8a8e-f45e8f9a614a",
+      "label": "Atlantic Salmon",
+      "canonical_name_ms": "Atlantic Salmon",
+      "display_name_en": "Atlantic Salmon",
+      "scientific_name": "Salmo salar",
+      "wwf_row_id": "10",
+      "database_mapping_status": "linked"
+    },
+    {
+      "class_index": 3,
       "class_code": "SF002",
       "fish_id": "SF002",
       "seafood_item_id": "e8e9dfc3-a60c-5a74-a29e-d390d6fa06eb",
       "label": "Bawal Hitam",
       "canonical_name_ms": "Bawal Hitam",
       "display_name_en": "Black Pomfret",
-      "scientific_name": "Parastromateus niger"
+      "scientific_name": "Parastromateus niger",
+      "wwf_row_id": "14",
+      "database_mapping_status": "linked"
     },
     {
-      "class_index": 2,
+      "class_index": 4,
       "class_code": "SF007",
       "fish_id": "SF007",
       "seafood_item_id": "f099ea5c-b32c-52cb-aa5c-6971a40bc33e",
       "label": "Cencaru",
       "canonical_name_ms": "Cencaru",
       "display_name_en": "Hardtail Scad",
-      "scientific_name": "Megalaspis cordyla"
+      "scientific_name": "Megalaspis cordyla",
+      "wwf_row_id": "19",
+      "database_mapping_status": "linked"
     },
     {
-      "class_index": 3,
+      "class_index": 5,
+      "class_code": "SF003",
+      "fish_id": "SF003",
+      "seafood_item_id": "09253ab4-60c5-5d81-a78b-87d46aeb31c7",
+      "label": "Ikan Merah",
+      "canonical_name_ms": "Ikan Merah",
+      "display_name_en": "Red Snapper",
+      "scientific_name": "Lutjanus sebae",
+      "wwf_row_id": "26",
+      "database_mapping_status": "linked"
+    },
+    {
+      "class_index": 6,
       "class_code": "SF008",
       "fish_id": "SF008",
       "seafood_item_id": "f19b73b2-62e6-52aa-9db1-94b45eccdf18",
       "label": "Jenahak",
       "canonical_name_ms": "Jenahak",
       "display_name_en": "John's Snapper",
-      "scientific_name": "Lutjanus johnii"
+      "scientific_name": "Lutjanus johnii",
+      "wwf_row_id": "29",
+      "database_mapping_status": "linked"
     },
     {
-      "class_index": 4,
+      "class_index": 7,
+      "class_code": "SF001",
+      "fish_id": "SF001",
+      "seafood_item_id": "ae00df08-2bc0-5341-97e5-93b8b45d450b",
+      "label": "Kembung / Pelaling",
+      "canonical_name_ms": "Kembung / Pelaling",
+      "display_name_en": "Indian Mackerel",
+      "scientific_name": "Rastrelliger kanagurta",
+      "wwf_row_id": "32",
+      "database_mapping_status": "linked"
+    },
+    {
+      "class_index": 8,
+      "class_code": "SF005",
+      "fish_id": "SF005",
+      "seafood_item_id": "113b33b3-eca1-5f76-a4b7-d33edfa0776e",
+      "label": "Kerapu Bintik",
+      "canonical_name_ms": "Kerapu Bintik",
+      "display_name_en": "Orange Spotted Grouper",
+      "scientific_name": "Epinephelus coioides",
+      "wwf_row_id": "34",
+      "database_mapping_status": "linked"
+    },
+    {
+      "class_index": 9,
+      "class_code": "SF037",
+      "fish_id": "SF037",
+      "seafood_item_id": "447f9384-861b-5e36-9386-d7744bd71e5b",
+      "label": "Kerapu Harimau",
+      "canonical_name_ms": "Kerapu Harimau",
+      "display_name_en": "Brown-marble Grouper",
+      "scientific_name": "Epinephelus fuscoguttatus",
+      "wwf_row_id": "36",
+      "database_mapping_status": "linked"
+    },
+    {
+      "class_index": 10,
+      "class_code": "SF038",
+      "fish_id": "SF038",
+      "seafood_item_id": "082d4dcc-75ed-51aa-9d37-d104fb9a54a3",
+      "label": "Kerapu Kertang",
+      "canonical_name_ms": "Kerapu Kertang",
+      "display_name_en": "Giant Grouper",
+      "scientific_name": "Epinephelus lanceolatus",
+      "wwf_row_id": "37",
+      "database_mapping_status": "linked"
+    },
+    {
+      "class_index": 11,
+      "class_code": "SF039",
+      "fish_id": "SF039",
+      "seafood_item_id": "10ac822e-fea8-5e84-95a6-3ed3088f9680",
+      "label": "Kerapu Lumpur",
+      "canonical_name_ms": "Kerapu Lumpur",
+      "display_name_en": "Malabar Grouper",
+      "scientific_name": "Epinephelus malabaricus",
+      "wwf_row_id": "38",
+      "database_mapping_status": "linked"
+    },
+    {
+      "class_index": 12,
+      "class_code": "SF041",
+      "fish_id": "SF041",
+      "seafood_item_id": "25d123cf-d94b-52ed-96ce-acb092d351eb",
+      "label": "Kerapu Tikus",
+      "canonical_name_ms": "Kerapu Tikus",
+      "display_name_en": "Humpback Grouper",
+      "scientific_name": "Cromileptes altivelis",
+      "wwf_row_id": "40",
+      "database_mapping_status": "linked"
+    },
+    {
+      "class_index": 13,
+      "class_code": "SF044",
+      "fish_id": "SF044",
+      "seafood_item_id": "af5e2014-da78-576c-a576-38d0b6392a1b",
+      "label": "Kunyit-kunyit",
+      "canonical_name_ms": "Kunyit-kunyit",
+      "display_name_en": "Brownstripe Red Snapper",
+      "scientific_name": "Lutjanus vitta",
+      "wwf_row_id": "45",
+      "database_mapping_status": "linked"
+    },
+    {
+      "class_index": 14,
+      "class_code": "SF046",
+      "fish_id": "SF046",
+      "seafood_item_id": "75c9a71d-23bd-5c5a-bf1f-e2543f1352e2",
+      "label": "Mameng",
+      "canonical_name_ms": "Mameng",
+      "display_name_en": "Humphead Wrasse",
+      "scientific_name": "Cheilinus undulatus",
+      "wwf_row_id": "47",
+      "database_mapping_status": "linked"
+    },
+    {
+      "class_index": 15,
+      "class_code": "SF051",
+      "fish_id": "SF051",
+      "seafood_item_id": "981381a9-6a26-51c5-a767-940ab14986ab",
+      "label": "Siakap Merah",
+      "canonical_name_ms": "Siakap Merah",
+      "display_name_en": "Mangrove Red Snapper",
+      "scientific_name": "Lutjanus argentimaculatus",
+      "wwf_row_id": "54",
+      "database_mapping_status": "linked"
+    },
+    {
+      "class_index": 16,
+      "class_code": "SF014",
+      "fish_id": "SF014",
+      "seafood_item_id": "a13d1d01-99a9-5e94-bc6d-81176f38aa33",
+      "label": "Siakap Putih",
+      "canonical_name_ms": "Siakap Putih",
+      "display_name_en": "Asian seabass / Barramundi",
+      "scientific_name": "Lates calcarifer",
+      "wwf_row_id": "55",
+      "database_mapping_status": "linked"
+    },
+    {
+      "class_index": 17,
       "class_code": "SF012",
       "fish_id": "SF012",
       "seafood_item_id": "1199fcbe-7fdd-5c16-a3a1-911247053b04",
       "label": "Tenggiri",
       "canonical_name_ms": "Tenggiri",
       "display_name_en": "Narrow-barred Spanish Mackerel",
-      "scientific_name": "Scomberomorus commerson"
+      "scientific_name": "Scomberomorus commerson",
+      "wwf_row_id": "57",
+      "database_mapping_status": "linked"
+    },
+    {
+      "class_index": 18,
+      "class_code": "SF004",
+      "fish_id": "SF004",
+      "seafood_item_id": "b9a4a905-3f56-503b-ac7c-0c83a1f32f78",
+      "label": "Tilapia",
+      "canonical_name_ms": "Tilapia",
+      "display_name_en": "Tilapia",
+      "scientific_name": "Oreochromis Niloticus",
+      "wwf_row_id": "60",
+      "database_mapping_status": "linked"
     }
-  ]
+  ],
+  "catalogue_code_note": "class_index is frozen from the ONNX export. class_code/fish_id are the 54-fish WWF catalogue identifiers, not the package placeholder SF013-SF026."
 }

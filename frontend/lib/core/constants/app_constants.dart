@@ -41,11 +41,25 @@ class AppConstants {
   static const List<String> scannerSpeciesLabels = [
     'Kembung / Pelaling (Indian Mackerel)',
     'Bawal Hitam (Black Pomfret)',
+    'Ikan Merah (Red Snapper)',
+    'Tilapia',
+    'Kerapu Bintik (Orange Spotted Grouper)',
     'Cencaru (Hardtail Scad)',
     'Jenahak (John\'s Snapper)',
     'Tenggiri (Spanish Mackerel)',
+    'Siakap Putih (Barramundi)',
+    'Alaskan Pollock',
+    'Atlantic Cod',
+    'Atlantic Salmon',
+    'Kerapu Harimau (Brown-marble Grouper)',
+    'Kerapu Kertang (Giant Grouper)',
+    'Kerapu Lumpur (Malabar Grouper)',
+    'Kerapu Tikus (Humpback Grouper)',
+    'Kunyit-kunyit (Brownstripe Red Snapper)',
+    'Mameng (Humphead Wrasse)',
+    'Siakap Merah (Mangrove Red Snapper)',
   ];
 
-  /// Iteration 2: the five-class CV scanner is in the chrome again.
+  /// Iteration 2: the 19-class ConvNeXt scanner is in the chrome.
   static const bool showScanner = true;
 }

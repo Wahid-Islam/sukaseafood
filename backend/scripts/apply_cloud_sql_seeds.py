@@ -33,6 +33,7 @@ FILES = (
     (SEED_DIR / "16_repoint_tongkol_biodiversity.sql"),
     (SEED_DIR / "17_deactivate_demuduk.sql"),
     (SEED_DIR / "18_cooking_54.sql"),
+    (SEED_DIR / "19_cv_i2_19class.sql"),
 )
 
 
