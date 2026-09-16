@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -73,12 +72,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
     context.push('/explore/category/${category.name}');
   }
 
-  void _surprise(List<SeafoodSummary> pool) {
-    if (pool.isEmpty) return;
-    final SeafoodSummary pick = pool[math.Random().nextInt(pool.length)];
-    context.push('/seafood/${pick.fishId}');
-  }
-
   @override
   Widget build(BuildContext context) {
     final CatalogController catalog = context.watch<CatalogController>();
@@ -86,19 +79,15 @@ class _ExploreScreenState extends State<ExploreScreen> {
       catalog.items,
     );
     final bool searching = _controller.text.trim().isNotEmpty;
-    final List<SeafoodSummary> popular = DiscoveryCatalog.filter(
-      browseable,
-      DiscoveryCategory.popular,
-    );
 
     return Scaffold(
       backgroundColor: AppColors.foam,
       body: SafeArea(
         child: ContentWidth(
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
             children: [
-              const _DiscoverHeader(),
+              const _ExploreHeader(),
               const SizedBox(height: 16),
               TextField(
                 controller: _controller,
@@ -107,18 +96,35 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   hintText: 'Search for seafood...',
                   filled: true,
                   fillColor: Colors.white,
-                  prefixIcon: const Icon(Icons.search),
+                  prefixIcon: const Icon(Icons.search, color: AppColors.muted),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(28),
                     borderSide: const BorderSide(color: AppColors.line),
                   ),
                   enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(28),
                     borderSide: const BorderSide(color: AppColors.line),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(28),
+                    borderSide: const BorderSide(
+                      color: AppColors.tealDark,
+                      width: 1.4,
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(height: 22),
+              const SizedBox(height: 8),
+              const Text(
+                'Try kembung, Ikan merah, tenggiri...',
+                style: TextStyle(
+                  color: AppColors.tealDark,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 16),
               if (searching)
                 _SearchResults(
                   searching: _searching,
@@ -134,23 +140,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   ),
                 )
               else ...[
-                _CategoryGrid(
-                  onSelect: _openCategory,
-                  onSeeAll: () => _openCategory(DiscoveryCategory.all),
-                ),
-                const SizedBox(height: 18),
-                _HeroBanner(
-                  onExplore: () => _openCategory(DiscoveryCategory.all),
-                ),
+                _ScannerPromo(onTap: () => context.go('/scan')),
                 const SizedBox(height: 22),
-                _PopularRow(
-                  items: popular,
-                  onSeeAll: () => _openCategory(DiscoveryCategory.popular),
-                ),
-                const SizedBox(height: 22),
-                _UndecidedCard(
-                  onScan: () => context.go('/scan'),
-                  onSurprise: () => _surprise(browseable),
+                _CategoryGrid(onSelect: _openCategory),
+                const SizedBox(height: 16),
+                _FullCatalogueBanner(
+                  count: browseable.length,
+                  onTap: () => _openCategory(DiscoveryCategory.all),
                 ),
               ],
             ],
@@ -161,283 +157,354 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 }
 
-class _DiscoverHeader extends StatelessWidget {
-  const _DiscoverHeader();
+class _ExploreHeader extends StatelessWidget {
+  const _ExploreHeader();
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Explore Seafood',
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-            fontSize: 28,
-            color: AppColors.navy,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Explore Seafood',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontSize: 28,
+                  color: AppColors.navy,
+                  height: 1.1,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Discover seafood. Choose better.',
+                style: TextStyle(color: AppColors.muted, fontSize: 14),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 4),
-        const Text(
-          'Discover new seafood, better choices',
-          style: TextStyle(color: AppColors.muted, fontSize: 14),
+        const SizedBox(width: 8),
+        const Column(
+          children: [
+            BrandLogo(size: 46),
+            SizedBox(height: 2),
+            Text(
+              'SukaSeafood',
+              style: TextStyle(
+                color: AppColors.navy,
+                fontWeight: FontWeight.w800,
+                fontSize: 10,
+              ),
+            ),
+            Text(
+              'BETTER CHOICES.\nHEALTHIER OCEANS.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.tealDark,
+                fontSize: 6.5,
+                fontWeight: FontWeight.w700,
+                height: 1.15,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ],
         ),
       ],
     );
   }
 }
 
-class _CategoryGrid extends StatelessWidget {
-  const _CategoryGrid({required this.onSelect, required this.onSeeAll});
+class _ScannerPromo extends StatelessWidget {
+  const _ScannerPromo({required this.onTap});
 
-  final ValueChanged<DiscoveryCategory> onSelect;
-  final VoidCallback onSeeAll;
-
-  static IconData _icon(DiscoveryCategory id) {
-    return switch (id) {
-      DiscoveryCategory.all => Icons.set_meal_outlined,
-      DiscoveryCategory.popular => Icons.star_outline_rounded,
-      DiscoveryCategory.sustainable => Icons.eco_outlined,
-      DiscoveryCategory.grill => Icons.outdoor_grill_outlined,
-      DiscoveryCategory.curry => Icons.soup_kitchen_outlined,
-      DiscoveryCategory.steam => Icons.rice_bowl_outlined,
-    };
-  }
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Row(
-          children: [
-            const Text(
-              'Browse by category',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-            ),
-            const Spacer(),
-            TextButton(onPressed: onSeeAll, child: const Text('See all')),
-          ],
-        ),
-        const SizedBox(height: 8),
-        GridView.count(
-          crossAxisCount: MediaQuery.sizeOf(context).width >= 700 ? 3 : 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 10,
-          crossAxisSpacing: 10,
-          childAspectRatio: 1.55,
-          children: [
-            for (final DiscoveryCategorySpec spec
-                in DiscoveryCatalog.categories)
-              Material(
-                color: Color(spec.tint),
-                borderRadius: BorderRadius.circular(18),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(18),
-                  onTap: () => onSelect(spec.id),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 14, 12, 12),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(22),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(22),
+          child: SizedBox(
+            height: 176,
+            width: double.infinity,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Image.asset(
+                  'assets/images/explore/scanner_card.jpg',
+                  fit: BoxFit.cover,
+                  alignment: const Alignment(0.28, 0),
+                ),
+                const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: <Color>[
+                        Color(0xF2082A3A),
+                        Color(0xCC082A3A),
+                        Color(0x66082A3A),
+                        Color(0x14082A3A),
+                      ],
+                      stops: <double>[0, 0.38, 0.62, 1],
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+                  child: FractionallySizedBox(
+                    widthFactor: 0.5,
+                    alignment: Alignment.centerLeft,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(_icon(spec.id), color: AppColors.navy, size: 22),
-                        const Spacer(),
-                        Text(
-                          spec.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 13,
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            Icons.photo_camera_outlined,
+                            color: Colors.white,
+                            size: 20,
                           ),
                         ),
-                        Text(
-                          spec.subtitle,
-                          maxLines: 1,
+                        const Spacer(),
+                        const Text(
+                          'Not sure what this is?',
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppColors.muted,
-                            fontSize: 11,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                            height: 1.15,
+                          ),
+                        ),
+                        const Text(
+                          'Scan a fish to identify it.',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: Colors.white70, fontSize: 12),
+                        ),
+                        const SizedBox(height: 8),
+                        const CircleAvatar(
+                          radius: 14,
+                          backgroundColor: AppColors.teal,
+                          child: Icon(
+                            Icons.arrow_forward,
+                            size: 16,
+                            color: Colors.white,
                           ),
                         ),
                       ],
                     ),
                   ),
                 ),
-              ),
-          ],
+              ],
+            ),
+          ),
         ),
-      ],
-    );
-  }
-}
-
-class _HeroBanner extends StatelessWidget {
-  const _HeroBanner({required this.onExplore});
-
-  final VoidCallback onExplore;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(22),
-      child: Stack(
-        children: [
-          const SizedBox(
-            height: 200,
-            width: double.infinity,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                  colors: <Color>[
-                    Color(0xFF063A46),
-                    Color(0xFF0E6B63),
-                    Color(0xFF1AA7A0),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Positioned.fill(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(18, 16, 18, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'EXPLORE',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 11,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    "Malaysia's Incredible Seafood",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 22,
-                      height: 1.15,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  const Expanded(
-                    child: Text(
-                      "From familiar favourites to hidden gems, discover seafood that's good for you and our oceans.",
-                      style: TextStyle(color: Colors.white70, fontSize: 12),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: onExplore,
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.zero,
-                    ),
-                    child: const Text('Start exploring  →'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
 }
 
-class _PopularRow extends StatelessWidget {
-  const _PopularRow({required this.items, required this.onSeeAll});
+class _CategoryGrid extends StatelessWidget {
+  const _CategoryGrid({required this.onSelect});
 
-  final List<SeafoodSummary> items;
-  final VoidCallback onSeeAll;
+  final ValueChanged<DiscoveryCategory> onSelect;
+
+  static IconData _icon(DiscoveryCategory id) {
+    return switch (id) {
+      DiscoveryCategory.popular => Icons.star_rounded,
+      DiscoveryCategory.sustainable => Icons.eco_outlined,
+      DiscoveryCategory.grill => Icons.local_fire_department_outlined,
+      DiscoveryCategory.curry => Icons.soup_kitchen_outlined,
+      DiscoveryCategory.steam => Icons.air,
+      DiscoveryCategory.fry => Icons.breakfast_dining_outlined,
+      _ => Icons.set_meal_outlined,
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
+    final List<DiscoveryCategory> tiles = DiscoveryCatalog.exploreTiles;
+    final int columns = MediaQuery.sizeOf(context).width >= 700 ? 3 : 2;
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            const Text(
-              'Popular in Malaysia',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-            ),
-            const Spacer(),
-            TextButton(onPressed: onSeeAll, child: const Text('See all')),
-          ],
-        ),
-        const SizedBox(height: 8),
-        SizedBox(
-          height: 168,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: items.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 10),
-            itemBuilder: (BuildContext context, int index) {
-              return SizedBox(
-                width: 132,
-                child: _SeafoodCard(item: items[index], compact: true),
-              );
-            },
+        const Text(
+          'Browse by category',
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 18,
+            color: AppColors.navy,
           ),
         ),
+        const SizedBox(height: 8),
+        for (int i = 0; i < tiles.length; i += columns)
+          Padding(
+            padding: EdgeInsets.only(
+              bottom: i + columns < tiles.length ? 10 : 0,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (int j = 0; j < columns; j++) ...[
+                  if (j > 0) const SizedBox(width: 10),
+                  Expanded(
+                    child: i + j < tiles.length
+                        ? _PhotoCategoryTile(
+                            spec: DiscoveryCatalog.specFor(tiles[i + j]),
+                            icon: _icon(tiles[i + j]),
+                            onTap: () => onSelect(tiles[i + j]),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+                ],
+              ],
+            ),
+          ),
       ],
     );
   }
 }
 
-class _UndecidedCard extends StatelessWidget {
-  const _UndecidedCard({required this.onScan, required this.onSurprise});
+class _PhotoCategoryTile extends StatelessWidget {
+  const _PhotoCategoryTile({
+    required this.spec,
+    required this.icon,
+    required this.onTap,
+  });
 
-  final VoidCallback onScan;
-  final VoidCallback onSurprise;
+  final DiscoveryCategorySpec spec;
+  final IconData icon;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return SoftCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Not sure what to choose?',
-            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Take a photo to identify a fish or browse by category to find the perfect match.',
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.navy,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(44, 44),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 148),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: Image.asset(
+                    spec.tileAsset,
+                    fit: BoxFit.cover,
+                    alignment: const Alignment(0.45, 0),
                   ),
-                  onPressed: onScan,
-                  icon: const Icon(Icons.photo_camera_outlined),
-                  label: const Text('Scan a fish'),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(44, 44),
+                const Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: <Color>[
+                          Color(0xF8F7F1E6),
+                          Color(0xE6F7F1E6),
+                          Color(0x99F7F1E6),
+                          Color(0x33F7F1E6),
+                          Color(0x00F7F1E6),
+                        ],
+                        stops: <double>[0, 0.28, 0.46, 0.68, 1],
+                      ),
+                    ),
                   ),
-                  onPressed: onSurprise,
-                  icon: const Icon(Icons.auto_awesome),
-                  label: const Text('Surprise me'),
                 ),
-              ),
-            ],
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+                  child: FractionallySizedBox(
+                    widthFactor: 0.7,
+                    alignment: Alignment.centerLeft,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(icon, color: AppColors.navy, size: 16),
+                        const SizedBox(height: 18),
+                        Text(
+                          spec.title,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13,
+                            color: AppColors.navy,
+                            height: 1.12,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          spec.subtitle,
+                          style: const TextStyle(
+                            color: AppColors.muted,
+                            fontSize: 10,
+                            height: 1.25,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Icon(
+                          Icons.arrow_forward,
+                          size: 14,
+                          color: AppColors.tealDark,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FullCatalogueBanner extends StatelessWidget {
+  const _FullCatalogueBanner({required this.count, required this.onTap});
+
+  final int count;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label:
+          'Explore the full catalogue. $count supported species. Browse A to Z.',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: ExcludeSemantics(
+              child: Image.asset(
+                'assets/images/explore/catalogue_cta.jpg',
+                width: double.infinity,
+                fit: BoxFit.fitWidth,
+                filterQuality: FilterQuality.medium,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -472,77 +539,34 @@ class _SearchResults extends StatelessWidget {
       return SoftCard(child: Text(error!));
     }
     if (results.isEmpty) {
-      return _EmptyDiscovery(
-        message: 'No supported seafood matched that name.',
-        actionLabel: 'Clear search',
-        onAction: onClear,
+      return SoftCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('No supported seafood matched that name.'),
+            const SizedBox(height: 10),
+            TextButton(onPressed: onClear, child: const Text('Clear search')),
+          ],
+        ),
       );
     }
-    return _PagedCardList(
-      title: 'Results',
-      items: results,
-      visibleCount: visibleCount,
-      onLoadMore: onLoadMore,
-    );
-  }
-}
-
-class _EmptyDiscovery extends StatelessWidget {
-  const _EmptyDiscovery({
-    required this.message,
-    required this.actionLabel,
-    required this.onAction,
-  });
-
-  final String message;
-  final String actionLabel;
-  final VoidCallback onAction;
-
-  @override
-  Widget build(BuildContext context) {
-    return SoftCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(message),
-          const SizedBox(height: 10),
-          TextButton(onPressed: onAction, child: Text(actionLabel)),
-        ],
-      ),
-    );
-  }
-}
-
-class _PagedCardList extends StatelessWidget {
-  const _PagedCardList({
-    required this.title,
-    required this.items,
-    required this.visibleCount,
-    required this.onLoadMore,
-  });
-
-  final String title;
-  final List<SeafoodSummary> items;
-  final int visibleCount;
-  final VoidCallback onLoadMore;
-
-  @override
-  Widget build(BuildContext context) {
     final List<SeafoodSummary> page = DiscoveryCatalog.page(
-      items,
+      results,
       visibleCount: visibleCount,
     );
-    final bool more = visibleCount < items.length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+        const Text(
+          'Results',
+          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+        ),
         const SizedBox(height: 10),
         for (final SeafoodSummary item in page) ...[
-          _SeafoodCard(item: item),
+          _SearchCard(item: item),
           const SizedBox(height: 10),
         ],
-        if (more)
+        if (visibleCount < results.length)
           Center(
             child: TextButton(
               onPressed: onLoadMore,
@@ -554,86 +578,53 @@ class _PagedCardList extends StatelessWidget {
   }
 }
 
-class _SeafoodCard extends StatelessWidget {
-  const _SeafoodCard({required this.item, this.compact = false});
+class _SearchCard extends StatelessWidget {
+  const _SearchCard({required this.item});
 
   final SeafoodSummary item;
-  final bool compact;
 
   @override
   Widget build(BuildContext context) {
-    final String label = item.classification ?? 'UNDETERMINED';
     return SoftCard(
       padding: const EdgeInsets.all(10),
       onTap: () => context.push('/seafood/${item.fishId}'),
-      child: compact
-          ? Column(
+      child: Row(
+        children: [
+          CatalogueFishArt(
+            fishId: item.fishId,
+            networkUrl: item.imageUrl,
+            width: 84,
+            height: 72,
+            borderRadius: 14,
+            fit: BoxFit.cover,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CatalogueFishArt(
-                  fishId: item.fishId,
-                  networkUrl: item.imageUrl,
-                  width: 112,
-                  height: 78,
-                  borderRadius: 12,
-                  fit: BoxFit.cover,
-                ),
-                const SizedBox(height: 8),
                 Text(
                   item.shortName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                  ),
                 ),
                 Text(
-                  label,
+                  item.scientificName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: AppTheme.classificationColor(label),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
+                  style: const TextStyle(
+                    fontStyle: FontStyle.italic,
+                    color: AppColors.muted,
                   ),
                 ),
-              ],
-            )
-          : Row(
-              children: [
-                CatalogueFishArt(
-                  fishId: item.fishId,
-                  networkUrl: item.imageUrl,
-                  width: 84,
-                  height: 72,
-                  borderRadius: 14,
-                  fit: BoxFit.cover,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item.shortName,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16,
-                        ),
-                      ),
-                      Text(
-                        item.namesSubtitle.isEmpty
-                            ? item.scientificName
-                            : item.namesSubtitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 6),
-                      ClassificationPill(label: label),
-                    ],
-                  ),
-                ),
-                const Icon(Icons.chevron_right),
               ],
             ),
+          ),
+          const Icon(Icons.chevron_right),
+        ],
+      ),
     );
   }
 }

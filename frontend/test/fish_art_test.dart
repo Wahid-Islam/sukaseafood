@@ -126,7 +126,7 @@ void main() {
       ),
     );
 
-    expect(find.text('Why?'), findsOneWidget);
+    expect(find.text('Why this rating?'), findsOneWidget);
     expect(find.text('Rating varies by catch method.'), findsOneWidget);
     expect(find.text('Hook-and-line'), findsOneWidget);
     expect(find.text('Gillnet'), findsOneWidget);

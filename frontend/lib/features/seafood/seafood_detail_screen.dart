@@ -238,25 +238,15 @@ class _SeafoodDetailScreenState extends State<SeafoodDetailScreen> {
                             _HubRow(
                               icon: Icons.eco_outlined,
                               iconColor: AppColors.good,
-                              title: 'WWF Sustainability',
+                              title: 'Sustainability',
                               subtitle:
-                                  'See catch-method ratings from WWF Save Our Seafood.',
+                                  'WWF catch-method ratings plus habitat, '
+                                  'IUCN status, and observed distribution.',
                               trailing: ClassificationPill(
                                 label: classification,
                               ),
                               onTap: () => context.push(
                                 '/seafood/$fishId/sustainability',
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            _HubRow(
-                              icon: Icons.public,
-                              iconColor: AppColors.tealDark,
-                              title: 'Biodiversity Context',
-                              subtitle:
-                                  'Habitat, depth, observed distribution and IUCN status.',
-                              onTap: () => context.push(
-                                '/seafood/$fishId/biodiversity',
                               ),
                             ),
                             const SizedBox(height: 10),
@@ -380,6 +370,7 @@ class _HubRow extends StatelessWidget {
     return SoftCard(
       onTap: onTap,
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Container(
             width: 40,
@@ -404,11 +395,12 @@ class _HubRow extends StatelessWidget {
               ],
             ),
           ),
-          if (trailing != null) ...[
-            Flexible(child: trailing!),
-            const SizedBox(width: 6),
-          ],
-          const Icon(Icons.chevron_right),
+          if (trailing != null) ...[const SizedBox(width: 8), trailing!],
+          const SizedBox(
+            width: 24,
+            height: 24,
+            child: Icon(Icons.chevron_right),
+          ),
         ],
       ),
     );

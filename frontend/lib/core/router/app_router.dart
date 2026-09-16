@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../auth/auth_controller.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/auth/onboarding_screen.dart';
+import '../../features/auth/signup_screen.dart';
 import '../../features/cooking/cooking_screen.dart';
 import '../../features/explore/category_landing_screen.dart';
 import '../../features/explore/explore_screen.dart';
@@ -14,7 +15,6 @@ import '../../features/home/notifications_screen.dart';
 import '../../features/price/price_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/scan/scan_screen.dart';
-import '../../features/seafood/biodiversity_context_screen.dart';
 import '../../features/seafood/seafood_detail_screen.dart';
 import '../../features/seafood/smart_swap_screen.dart';
 import '../../features/seafood/sustainability_biodiversity_screen.dart';
@@ -27,7 +27,8 @@ GoRouter createRouter(AuthController auth) {
       if (!auth.isReady) return null;
 
       final String loc = state.matchedLocation;
-      final bool onAuth = loc == '/onboarding' || loc == '/login';
+      final bool onAuth =
+          loc == '/onboarding' || loc == '/login' || loc == '/signup';
 
       if (!auth.isSignedIn && !onAuth) return '/onboarding';
       if (auth.isSignedIn && onAuth) return '/home';
@@ -37,6 +38,10 @@ GoRouter createRouter(AuthController auth) {
       GoRoute(
         path: '/onboarding',
         builder: (context, state) => const OnboardingScreen(),
+      ),
+      GoRoute(
+        path: '/signup',
+        builder: (context, state) => const SignupScreen(),
       ),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       StatefulShellRoute.indexedStack(
@@ -116,10 +121,8 @@ GoRouter createRouter(AuthController auth) {
       ),
       GoRoute(
         path: '/seafood/:id/biodiversity',
-        builder: (context, state) {
-          return BiodiversityContextScreen(
-            seafoodId: state.pathParameters['id']!,
-          );
+        redirect: (BuildContext context, GoRouterState state) {
+          return '/seafood/${state.pathParameters['id']}/sustainability';
         },
       ),
       GoRoute(

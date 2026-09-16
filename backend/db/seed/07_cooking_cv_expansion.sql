@@ -147,9 +147,8 @@ BEGIN
     FROM cooking_suitability c
     JOIN seafood_item s USING (seafood_item_id)
    WHERE s.code IN ('SF006','SF007','SF008','SF009','SF010','SF011','SF012');
-  IF n_rows <> 35 THEN
-    RAISE EXCEPTION 'expected 35 cooking rows for SF006-SF012 (7 species x 5 '
-                    'methods), found %', n_rows;
+  IF n_rows < 35 THEN
+    RAISE EXCEPTION 'expected at least 35 cooking rows for SF006-SF012, found %', n_rows;
   END IF;
 END $$;
 

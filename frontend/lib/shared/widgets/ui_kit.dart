@@ -416,3 +416,28 @@ class ContentWidth extends StatelessWidget {
     );
   }
 }
+
+class ShoreFooter extends StatelessWidget {
+  const ShoreFooter({
+    super.key,
+    required this.asset,
+    this.height,
+    this.fit = BoxFit.fitWidth,
+  });
+
+  final String asset;
+  final double? height;
+  final BoxFit fit;
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.asset(
+      asset,
+      height: height,
+      width: double.infinity,
+      fit: fit,
+      alignment: Alignment.topCenter,
+      errorBuilder: (_, _, _) => SizedBox(height: height ?? 96),
+    );
+  }
+}

@@ -5,6 +5,11 @@
 -- no earlier seed created, plus the data_source and source_snapshot the
 -- forecast rows hang off.
 --
+-- SF013 Demuduk is forecast-only. It is not in the WWF 54-fish list, so it
+-- is inserted inactive and stays out of Discover / search. Kikek (SF043)
+-- is the public ponyfish listing. Do not DELETE SF013: PriceCatcher item
+-- 1916 and the R forecast rows already resolve to this id.
+--
 -- Why these two species exist here and not in 04 or 05:
 --   04 froze the five I1 species. 05 added the seven the image corpus covers,
 --   because the scanner can only name what it has images for. The forecasting
@@ -34,24 +39,25 @@ SELECT
   suka_uuid5('seafood_item:' || v.code),
   v.code, v.canonical_name_ms, v.display_name_en,
   v.scientific_name, lower(trim(v.scientific_name)), v.taxonomic_level, v.family,
-  v.fish_type, v.description, v.supports_cv, TRUE, v.notes
+  v.fish_type, v.description, v.supports_cv, v.active, v.notes
 FROM (VALUES
   -- Recorded at family level because that is as far as the evidence goes. The
   -- project mapping lists this row as "Ponyfish" with no species named, and
   -- inventing a binomial to fill the column would be a fabricated fact.
+  -- active = FALSE: not in the WWF 54-fish public catalogue.
   ('SF013', 'Demuduk / Cupak / Cermin', 'Ponyfish', 'Leiognathidae spp.',
    'family', 'Leiognathidae', 'marine demersal',
    'Small silvery ponyfish sold cheaply by the heap under several regional names. Usually fried whole or salted; a budget staple rather than a centrepiece fish.',
-   FALSE,
-   'Family-level record: the project mapping names no species, and the public WWF guide does not expose this listing. PriceCatcher item 1916.'),
+   FALSE, FALSE,
+   'Family-level record: the project mapping names no species, and the public WWF guide does not expose this listing. Inactive in the public catalogue. PriceCatcher item 1916.'),
 
   ('SF014', 'Siakap Putih', 'Asian Seabass', 'Lates calcarifer',
    'species', 'Latidae', 'coastal / farmed',
    'Barramundi, farmed and wild-caught, and the default restaurant steamed fish. Year-round farming keeps its price steadier than most wild species.',
-   FALSE,
+   FALSE, TRUE,
    'PriceCatcher lists this as "Siakap"; WWF uses "Siakap Putih". The WWF name is canonical here so the sustainability and price journeys agree.')
 ) AS v(code, canonical_name_ms, display_name_en, scientific_name,
-       taxonomic_level, family, fish_type, description, supports_cv, notes)
+       taxonomic_level, family, fish_type, description, supports_cv, active, notes)
 ON CONFLICT (seafood_item_id) DO UPDATE SET
   code                         = EXCLUDED.code,
   canonical_name_ms            = EXCLUDED.canonical_name_ms,

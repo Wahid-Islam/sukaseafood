@@ -24,7 +24,7 @@ from sqlalchemy import func, inspect as sa_inspect, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.config import get_settings
+from app.services.iucn import apply_iucn
 from app.models import (
     BiodiversityOccurrence,
     BiodiversityProfile,
@@ -349,18 +349,32 @@ def _to_method_rating(assessment: WwfAssessment) -> MethodRatingOut:
     )
 
 
-def _suitable_methods(item: SeafoodItem) -> list[str]:
-    """Cooking methods with a curated score of 4 or 5."""
+def _cooking_rows(item: SeafoodItem) -> list[CookingSuitability]:
     if "cooking_suitability" in sa_inspect(item).unloaded:
         return []
+    return list(item.cooking_suitability)
+
+
+def _suitable_methods(item: SeafoodItem) -> list[str]:
+    """Cooking methods with a curated score of 4 or 5."""
     methods: list[str] = []
-    for row in item.cooking_suitability:
+    for row in _cooking_rows(item):
         if (row.suitability_score or 0) < 4:
             continue
         code = (row.method.code if row.method is not None else "").lower()
         if code and code not in methods:
             methods.append(code)
     return methods
+
+
+def _cooking_scores(item: SeafoodItem) -> dict[str, int]:
+    scores: dict[str, int] = {}
+    for row in _cooking_rows(item):
+        code = (row.method.code if row.method is not None else "").lower()
+        if not code:
+            continue
+        scores[code] = int(row.suitability_score or 0)
+    return scores
 
 
 def to_summary(item: SeafoodItem) -> SeafoodSummaryOut:
@@ -378,6 +392,7 @@ def to_summary(item: SeafoodItem) -> SeafoodSummaryOut:
         classification=classification,
         description=(item.description or "").strip(),
         suitable_methods=_suitable_methods(item),
+        cooking_scores=_cooking_scores(item),
     )
 
 
@@ -581,6 +596,10 @@ async def build_profile(session: AsyncSession, item: SeafoodItem) -> SeafoodProf
         key=lambda c: (-(c.suitability_score or 0), c.method.code),
     )
     sustainability = to_sustainability(item)
+    biodiversity = await apply_iucn(
+        to_biodiversity(item, sustainability),
+        item.scientific_name,
+    )
 
     return SeafoodProfileOut(
         fish_id=item.code,
@@ -598,7 +617,7 @@ async def build_profile(session: AsyncSession, item: SeafoodItem) -> SeafoodProf
             for a in sorted(item.aliases, key=lambda a: a.alias_name)
         ],
         sustainability=sustainability,
-        biodiversity=to_biodiversity(item, sustainability),
+        biodiversity=biodiversity,
         cooking=[
             CookingSuitabilityOut(
                 method=c.method.code.lower(),

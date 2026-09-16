@@ -197,8 +197,8 @@ class MockCatalog {
     SeafoodItem(
       id: 'tongkol',
       commonName: 'Tongkol',
-      scientificName: 'Euthynnus affinis',
-      alsoKnownAs: 'Kawakawa tuna',
+      scientificName: 'Thunnus tonggol',
+      alsoKnownAs: 'Longtail tuna',
       fishType: 'Pelagic Fish',
       commonIn: 'Malaysia',
       marketAvailability: 'Year-round',

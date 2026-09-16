@@ -1,25 +1,83 @@
+import 'package:flutter/material.dart';
+
 import '../models/seafood.dart';
 import '../../shared/widgets/catalogue_fish_art.dart';
 
 /// Curated Discovery groupings. Filters never invent ratings.
-enum DiscoveryCategory { all, popular, sustainable, grill, curry, steam }
+enum DiscoveryCategory {
+  all,
+  popular,
+  sustainable,
+  grill,
+  curry,
+  steam,
+  fry,
+  soup,
+  bake,
+  raw;
+
+  /// Canonical cooking-method code used by `suitable_methods`, or null.
+  String? get cookingMethod => switch (this) {
+    DiscoveryCategory.grill => 'grill',
+    DiscoveryCategory.curry => 'curry',
+    DiscoveryCategory.steam => 'steam',
+    DiscoveryCategory.fry => 'fry',
+    DiscoveryCategory.soup => 'soup',
+    DiscoveryCategory.bake => 'bake',
+    DiscoveryCategory.raw => 'raw',
+    DiscoveryCategory.all ||
+    DiscoveryCategory.popular ||
+    DiscoveryCategory.sustainable => null,
+  };
+}
+
+class WhyFact {
+  const WhyFact({required this.icon, required this.title, required this.body});
+
+  final IconData icon;
+  final String title;
+  final String body;
+}
 
 class DiscoveryCategorySpec {
   const DiscoveryCategorySpec({
     required this.id,
     required this.title,
     required this.subtitle,
-    required this.tint,
+    this.navTitle,
+    this.navSubtitle,
     required this.heroTitle,
+    this.heroLead = '',
     required this.heroBody,
+    required this.scriptLine,
+    required this.tileAsset,
+    required this.bannerAsset,
+    required this.whyTitle,
+    required this.whyBody,
+    required this.whyFacts,
+    required this.picksEyebrow,
+    required this.picksSubtitle,
   });
 
   final DiscoveryCategory id;
   final String title;
   final String subtitle;
-  final int tint;
+  final String? navTitle;
+  final String? navSubtitle;
   final String heroTitle;
+  final String heroLead;
   final String heroBody;
+  final String scriptLine;
+  final String tileAsset;
+  final String bannerAsset;
+  final String whyTitle;
+  final String whyBody;
+  final List<WhyFact> whyFacts;
+  final String picksEyebrow;
+  final String picksSubtitle;
+
+  String get pageTitle => navTitle ?? title;
+  String get pageSubtitle => navSubtitle ?? subtitle;
 }
 
 class PopularCardCopy {
@@ -34,6 +92,15 @@ class DiscoveryCatalog {
 
   static const int pageSize = 6;
 
+  static const List<DiscoveryCategory> exploreTiles = <DiscoveryCategory>[
+    DiscoveryCategory.popular,
+    DiscoveryCategory.sustainable,
+    DiscoveryCategory.grill,
+    DiscoveryCategory.curry,
+    DiscoveryCategory.steam,
+    DiscoveryCategory.fry,
+  ];
+
   static const List<String> popularIds = <String>[
     'SF001',
     'SF003',
@@ -45,129 +112,327 @@ class DiscoveryCatalog {
     'SF015',
   ];
 
-  static const Map<String, PopularCardCopy> popularCopy =
-      <String, PopularCardCopy>{
-        'SF001': PopularCardCopy(
-          blurb:
-              'An everyday Malaysian favourite — affordable, tasty and incredibly versatile.',
-          tags: <String>['Affordable', 'Versatile'],
-        ),
-        'SF003': PopularCardCopy(
-          blurb:
-              'A popular choice for its firm texture and rich flavour.',
-          tags: <String>['Rich Flavour', 'Great for Steaming'],
-        ),
-        'SF014': PopularCardCopy(
-          blurb:
-              'A local favourite with mild flavour and plenty of cooking options.',
-          tags: <String>['Mild Taste', 'Versatile'],
-        ),
-        'SF012': PopularCardCopy(
-          blurb:
-              'Loved for its firm texture and rich taste, especially in local dishes.',
-          tags: <String>['Rich Taste', 'Popular in Local Dishes'],
-        ),
-        'SF007': PopularCardCopy(
-          blurb:
-              'A familiar market fish, especially popular grilled or stuffed.',
-          tags: <String>['Great for Grilling', 'Local Favourite'],
-        ),
-        'SF011': PopularCardCopy(
-          blurb:
-              'An affordable, everyday fish commonly enjoyed in Malaysian homes.',
-          tags: <String>['Affordable', 'Widely Available'],
-        ),
-        'SF004': PopularCardCopy(
-          blurb:
-              'Widely available, affordable and easy to prepare in many styles.',
-          tags: <String>['Affordable', 'Family Favourite'],
-        ),
-        'SF015': PopularCardCopy(
-          blurb: 'A versatile tuna commonly used in curries.',
-          tags: <String>['Versatile', 'Great for Curries'],
-        ),
-      };
+  static const Map<String, PopularCardCopy>
+  popularCopy = <String, PopularCardCopy>{
+    'SF001': PopularCardCopy(
+      blurb:
+          'An everyday Malaysian favourite — affordable, tasty and versatile.',
+      tags: <String>['Affordable', 'Versatile'],
+    ),
+    'SF003': PopularCardCopy(
+      blurb:
+          'Firm texture and rich flavour, popular at home and in restaurants.',
+      tags: <String>['Rich Flavour', 'Popular'],
+    ),
+    'SF014': PopularCardCopy(
+      blurb:
+          'A local favourite with mild flavour and plenty of cooking options.',
+      tags: <String>['Mild Taste', 'Family Favourite'],
+    ),
+    'SF012': PopularCardCopy(
+      blurb:
+          'Loved for its firm texture and rich taste, especially in local dishes.',
+      tags: <String>['Rich Taste', 'Popular in Local Dishes'],
+    ),
+    'SF007': PopularCardCopy(
+      blurb: 'A familiar market fish, especially popular grilled or stuffed.',
+      tags: <String>['Great for Grilling', 'Local Favourite'],
+    ),
+    'SF011': PopularCardCopy(
+      blurb:
+          'An affordable, everyday fish commonly enjoyed in Malaysian homes.',
+      tags: <String>['Affordable', 'Widely Available'],
+    ),
+    'SF004': PopularCardCopy(
+      blurb: 'Widely available, affordable and easy to prepare in many styles.',
+      tags: <String>['Affordable', 'Family Favourite'],
+    ),
+    'SF015': PopularCardCopy(
+      blurb: 'A versatile tuna commonly used in curries.',
+      tags: <String>['Versatile', 'Great for Curries'],
+    ),
+  };
 
   static const List<DiscoveryCategorySpec> categories = <DiscoveryCategorySpec>[
     DiscoveryCategorySpec(
       id: DiscoveryCategory.all,
       title: 'All Seafood',
       subtitle: 'Explore our full list',
-      tint: 0xFFE8F4FF,
-      heroTitle: 'The full catalogue',
+      heroTitle: "Malaysia's seafood, all in one place",
       heroBody:
-          'Every supported species currently in SukaSeafood — search, scan or open a profile.',
+          'From familiar favourites to hidden gems, explore all fish species supported in SukaSeafood.',
+      scriptLine: 'Same Oceans Brighter Tomorrows',
+      tileAsset: 'assets/images/explore/banner_all.jpg',
+      bannerAsset: 'assets/images/explore/banner_all.jpg',
+      whyTitle: '54 species',
+      whyBody: 'Explore every supported fish species in SukaSeafood.',
+      whyFacts: <WhyFact>[
+        WhyFact(
+          icon: Icons.diversity_3_outlined,
+          title: 'A diverse range',
+          body: '',
+        ),
+        WhyFact(
+          icon: Icons.eco_outlined,
+          title: 'Sustainability insights',
+          body: '',
+        ),
+        WhyFact(
+          icon: Icons.soup_kitchen_outlined,
+          title: 'Cooking inspiration',
+          body: '',
+        ),
+      ],
+      picksEyebrow: '',
+      picksSubtitle: '',
     ),
     DiscoveryCategorySpec(
       id: DiscoveryCategory.popular,
       title: 'Popular in Malaysia',
-      subtitle: 'Local favourites, loved across the country',
-      tint: 0xFFFFF3D6,
+      subtitle: 'Local favourites, loved across the country.',
       heroTitle: 'A Taste of Malaysia',
-      heroBody:
-          'These are seafood most commonly enjoyed across Malaysia — from local markets to home kitchens.',
+      heroBody: 'Seafood loved across Malaysian markets and home kitchens.',
+      scriptLine: 'Same Oceans Brighter Futures',
+      tileAsset: 'assets/images/explore/category_popular.jpg',
+      bannerAsset: 'assets/images/explore/banner_popular.jpg',
+      whyTitle: 'Why these fish?',
+      whyBody: 'Familiar names. Everyday choices. Real Malaysian favourites.',
+      whyFacts: <WhyFact>[
+        WhyFact(
+          icon: Icons.location_on_outlined,
+          title: 'Local favourites',
+          body: '',
+        ),
+        WhyFact(
+          icon: Icons.storefront_outlined,
+          title: 'Market staples',
+          body: '',
+        ),
+        WhyFact(icon: Icons.eco_outlined, title: 'Commonly found', body: ''),
+      ],
+      picksEyebrow: '',
+      picksSubtitle: '',
     ),
     DiscoveryCategorySpec(
       id: DiscoveryCategory.sustainable,
-      title: 'Good Sustainable Choices',
-      subtitle: 'Better for our ocean',
-      tint: 0xFFE3F6E8,
-      heroTitle: 'Better-rated choices',
-      heroBody:
-          'Species with a recorded WWF Good Choice or Best Choice rating. Unrated species stay out of this list.',
+      title: 'Better Choices',
+      subtitle: 'More sustainable options for healthier oceans.',
+      navTitle: 'For Sustainable Choices',
+      navSubtitle: 'Good for our oceans',
+      heroTitle: 'Good sustainable choices',
+      heroBody: 'Delicious seafood today, healthier oceans tomorrow.',
+      scriptLine: 'Choose Seafood Choose a Brighter Future',
+      tileAsset: 'assets/images/explore/category_better.jpg',
+      bannerAsset: 'assets/images/explore/banner_better.jpg',
+      whyTitle: 'Why sustainable seafood?',
+      whyBody: 'Better for oceans, communities and future generations.',
+      whyFacts: <WhyFact>[
+        WhyFact(
+          icon: Icons.public,
+          title: 'Healthier oceans',
+          body: 'Helps protect marine ecosystems',
+        ),
+        WhyFact(
+          icon: Icons.people,
+          title: 'Supports local communities',
+          body: 'Sustains livelihoods and coastal economies',
+        ),
+        WhyFact(
+          icon: Icons.eco_outlined,
+          title: 'A brighter tomorrow',
+          body: 'Ensures seafood for future generations',
+        ),
+      ],
+      picksEyebrow: 'sustainable picks',
+      picksSubtitle: 'Great choices for you and our oceans.',
     ),
     DiscoveryCategorySpec(
       id: DiscoveryCategory.grill,
       title: 'For Grilling',
-      subtitle: 'Great for the BBQ',
-      tint: 0xFFFFE8E4,
-      heroTitle: 'Better for the grill',
+      subtitle: 'Fish that love the flame.',
+      heroTitle: 'Fire up the grill',
+      heroLead: 'Fish that love the flame.',
       heroBody:
-          'Species with a recorded grilling suitability of 4 or more.',
+          'Firm, flavourful seafood that holds up beautifully on the grill.',
+      scriptLine: 'Great Seafood Greater Moments',
+      tileAsset: 'assets/images/explore/category_grill.jpg',
+      bannerAsset: 'assets/images/explore/banner_grill.jpg',
+      whyTitle: 'Why these fish?',
+      whyBody: 'Chosen for their grilling qualities.',
+      whyFacts: <WhyFact>[
+        WhyFact(
+          icon: Icons.whatshot_outlined,
+          title: 'Firm flesh',
+          body: 'Holds together over high heat',
+        ),
+        WhyFact(
+          icon: Icons.air,
+          title: 'Rich flavour',
+          body: 'Works beautifully with smoke and char',
+        ),
+        WhyFact(
+          icon: Icons.outdoor_grill_outlined,
+          title: 'Whole or fillet',
+          body: 'Easy to cook your way',
+        ),
+      ],
+      picksEyebrow: 'seafood picks',
+      picksSubtitle: 'Great for the grill. Great on your plate.',
     ),
     DiscoveryCategorySpec(
       id: DiscoveryCategory.curry,
       title: 'For Curry',
-      subtitle: 'Perfect for local dishes',
-      tint: 0xFFFFF0E0,
-      heroTitle: 'Better for curry',
+      subtitle: 'Perfect for local dishes.',
+      heroTitle: 'Made for curry',
+      heroLead: 'Fish that hold their own in the sauce.',
       heroBody:
-          'Species with a recorded curry suitability of 4 or more.',
+          'Rich, flavourful seafood that works beautifully with Malaysian curries.',
+      scriptLine: 'Same Oceans Richer Flavours',
+      tileAsset: 'assets/images/explore/category_curry.jpg',
+      bannerAsset: 'assets/images/explore/banner_curry.jpg',
+      whyTitle: 'Why these fish?',
+      whyBody: 'Chosen for their curry qualities.',
+      whyFacts: <WhyFact>[
+        WhyFact(
+          icon: Icons.set_meal_outlined,
+          title: 'Firm texture',
+          body: 'Stays together in the sauce',
+        ),
+        WhyFact(
+          icon: Icons.eco_outlined,
+          title: 'Flavour friendly',
+          body: 'Works with rich spices and herbs',
+        ),
+        WhyFact(
+          icon: Icons.soup_kitchen_outlined,
+          title: 'Sauce ready',
+          body: 'Absorbs curry without falling apart',
+        ),
+      ],
+      picksEyebrow: 'seafood picks',
+      picksSubtitle: 'Perfect for curries. Great on your plate.',
     ),
     DiscoveryCategorySpec(
       id: DiscoveryCategory.steam,
       title: 'For Steaming',
-      subtitle: 'Light and healthy',
-      tint: 0xFFE7F3FF,
-      heroTitle: 'Better for steaming',
+      subtitle: 'Light and healthy choices.',
+      heroTitle: 'Let the fish shine',
       heroBody:
-          'Species with a recorded steaming suitability of 4 or more.',
+          'Fresh, delicate seafood that stays moist and tender when steamed.',
+      scriptLine: 'Simple Cooking Extraordinary Flavour',
+      tileAsset: 'assets/images/explore/category_steam.jpg',
+      bannerAsset: 'assets/images/explore/banner_steam.jpg',
+      whyTitle: 'Why these fish?',
+      whyBody: 'Chosen for their steaming qualities.',
+      whyFacts: <WhyFact>[
+        WhyFact(
+          icon: Icons.water_drop_outlined,
+          title: 'Delicate & moist',
+          body: 'Steaming keeps the flesh tender',
+        ),
+        WhyFact(
+          icon: Icons.eco_outlined,
+          title: 'Clean flavour',
+          body: "Lets the fish's natural taste shine",
+        ),
+        WhyFact(
+          icon: Icons.rice_bowl_outlined,
+          title: 'Whole or fillet',
+          body: 'Simple cooking, minimal fuss',
+        ),
+      ],
+      picksEyebrow: 'seafood picks',
+      picksSubtitle: 'Perfect for steaming. Great on your plate.',
+    ),
+    DiscoveryCategorySpec(
+      id: DiscoveryCategory.fry,
+      title: 'For Frying',
+      subtitle: 'Crispy, flavourful favourites.',
+      heroTitle: 'Crisp in the pan',
+      heroBody: 'Seafood that fries evenly and stays flavourful in a hot pan.',
+      scriptLine: 'Everyday Favourites Golden Moments',
+      tileAsset: 'assets/images/explore/category_fry.jpg',
+      bannerAsset: 'assets/images/explore/banner_fry.jpg',
+      whyTitle: 'Why these fish?',
+      whyBody: 'Chosen for their frying qualities.',
+      whyFacts: <WhyFact>[
+        WhyFact(
+          icon: Icons.local_fire_department_outlined,
+          title: 'Crispy skin',
+          body: 'Takes a hot pan without drying out',
+        ),
+        WhyFact(
+          icon: Icons.restaurant_outlined,
+          title: 'Even cooking',
+          body: 'Small whole fish and firm cuts fry well',
+        ),
+        WhyFact(
+          icon: Icons.set_meal_outlined,
+          title: 'Whole or fillet',
+          body: 'Easy weeknight frying',
+        ),
+      ],
+      picksEyebrow: 'seafood picks',
+      picksSubtitle: 'Great for frying. Great on your plate.',
+    ),
+    DiscoveryCategorySpec(
+      id: DiscoveryCategory.soup,
+      title: 'For Soup',
+      subtitle: 'Broth and stock',
+      heroTitle: 'Better for soup',
+      heroBody: 'Species with a recorded soup suitability of 4 or more.',
+      scriptLine: 'Same Oceans Brighter Futures',
+      tileAsset: 'assets/images/explore/banner_all.jpg',
+      bannerAsset: 'assets/images/explore/banner_all.jpg',
+      whyTitle: 'Why these fish?',
+      whyBody: 'Chosen for their soup qualities.',
+      whyFacts: <WhyFact>[],
+      picksEyebrow: 'seafood picks',
+      picksSubtitle: 'Great for soup.',
+    ),
+    DiscoveryCategorySpec(
+      id: DiscoveryCategory.bake,
+      title: 'For Baking',
+      subtitle: 'Oven-ready cuts',
+      heroTitle: 'Better for baking',
+      heroBody: 'Species with a recorded baking suitability of 4 or more.',
+      scriptLine: 'Same Oceans Brighter Futures',
+      tileAsset: 'assets/images/explore/banner_all.jpg',
+      bannerAsset: 'assets/images/explore/banner_all.jpg',
+      whyTitle: 'Why these fish?',
+      whyBody: 'Chosen for their baking qualities.',
+      whyFacts: <WhyFact>[],
+      picksEyebrow: 'seafood picks',
+      picksSubtitle: 'Great for baking.',
+    ),
+    DiscoveryCategorySpec(
+      id: DiscoveryCategory.raw,
+      title: 'For Raw',
+      subtitle: 'Sashimi-grade only',
+      heroTitle: 'Better served raw',
+      heroBody:
+          'Species with a recorded raw or cured suitability of 4 or more.',
+      scriptLine: 'Same Oceans Brighter Futures',
+      tileAsset: 'assets/images/explore/banner_all.jpg',
+      bannerAsset: 'assets/images/explore/banner_all.jpg',
+      whyTitle: 'Why these fish?',
+      whyBody: 'Only species scored for raw or cured service.',
+      whyFacts: <WhyFact>[],
+      picksEyebrow: 'seafood picks',
+      picksSubtitle: 'Sashimi-grade handling required.',
     ),
   ];
 
   static DiscoveryCategory? parse(String? raw) {
-    switch ((raw ?? '').trim().toLowerCase()) {
-      case 'all':
-        return DiscoveryCategory.all;
-      case 'popular':
-        return DiscoveryCategory.popular;
-      case 'sustainable':
-        return DiscoveryCategory.sustainable;
-      case 'grill':
-        return DiscoveryCategory.grill;
-      case 'curry':
-        return DiscoveryCategory.curry;
-      case 'steam':
-        return DiscoveryCategory.steam;
-      default:
-        return null;
+    final String key = (raw ?? '').trim().toLowerCase();
+    for (final DiscoveryCategory value in DiscoveryCategory.values) {
+      if (value.name == key) return value;
     }
+    return null;
   }
 
   static DiscoveryCategorySpec specFor(DiscoveryCategory category) {
-    return categories.firstWhere(
-      (DiscoveryCategorySpec e) => e.id == category,
-    );
+    return categories.firstWhere((DiscoveryCategorySpec e) => e.id == category);
   }
 
   static bool isBrowseable(SeafoodSummary item) {
@@ -198,28 +463,56 @@ class DiscoveryCatalog {
     final List<SeafoodSummary> pool = browseable(items);
     switch (category) {
       case DiscoveryCategory.all:
-        return pool;
+        final List<SeafoodSummary> sorted = List<SeafoodSummary>.from(pool)
+          ..sort(
+            (SeafoodSummary a, SeafoodSummary b) =>
+                a.shortName.toLowerCase().compareTo(b.shortName.toLowerCase()),
+          );
+        return sorted;
       case DiscoveryCategory.popular:
-        final List<SeafoodSummary> picked = <SeafoodSummary>[
+        return <SeafoodSummary>[
           for (final String id in popularIds)
             ...pool.where((SeafoodSummary e) => e.fishId.toUpperCase() == id),
         ];
-        return picked;
       case DiscoveryCategory.sustainable:
         return pool.where(_isGoodChoice).toList();
       case DiscoveryCategory.grill:
-        return pool
-            .where((SeafoodSummary e) => e.suitableMethods.contains('grill'))
-            .toList();
       case DiscoveryCategory.curry:
-        return pool
-            .where((SeafoodSummary e) => e.suitableMethods.contains('curry'))
-            .toList();
       case DiscoveryCategory.steam:
+      case DiscoveryCategory.fry:
+      case DiscoveryCategory.soup:
+      case DiscoveryCategory.bake:
+      case DiscoveryCategory.raw:
+        final String method = category.cookingMethod!;
         return pool
-            .where((SeafoodSummary e) => e.suitableMethods.contains('steam'))
+            .where((SeafoodSummary e) => e.suitableMethods.contains(method))
             .toList();
     }
+  }
+
+  static String letterFor(SeafoodSummary item) {
+    final String ch = item.shortName.trim().isEmpty
+        ? ''
+        : item.shortName.trim()[0].toUpperCase();
+    final bool az = ch.compareTo('A') >= 0 && ch.compareTo('Z') <= 0;
+    return az ? ch : '#';
+  }
+
+  static Map<String, List<SeafoodSummary>> groupedByLetter(
+    List<SeafoodSummary> items,
+  ) {
+    final Map<String, List<SeafoodSummary>> groups =
+        <String, List<SeafoodSummary>>{};
+    for (final SeafoodSummary item in items) {
+      groups.putIfAbsent(letterFor(item), () => <SeafoodSummary>[]).add(item);
+    }
+    for (final List<SeafoodSummary> group in groups.values) {
+      group.sort(
+        (SeafoodSummary a, SeafoodSummary b) =>
+            a.shortName.toLowerCase().compareTo(b.shortName.toLowerCase()),
+      );
+    }
+    return groups;
   }
 
   static String blurbFor(SeafoodSummary item, DiscoveryCategory category) {
@@ -229,21 +522,35 @@ class DiscoveryCatalog {
     }
     final String recorded = item.description.trim();
     if (recorded.isNotEmpty) return recorded;
-    return item.namesSubtitle;
+    final String type = item.fishType.trim();
+    if (type.isNotEmpty) {
+      return '${item.shortName} is a recorded ${type.toLowerCase()}.';
+    }
+    return '${item.shortName} is a recorded species in the SukaSeafood catalogue.';
   }
 
-  static List<String> tagsFor(
-    SeafoodSummary item,
-    DiscoveryCategory category,
-  ) {
+  static String? fitLabel(SeafoodSummary item, DiscoveryCategory category) {
+    final String? method = category.cookingMethod;
+    if (method == null) return null;
+    final int? score = item.cookingScores[method];
+    if (score == null || score < 1 || score > 5) return null;
+    final String name = '${method[0].toUpperCase()}${method.substring(1)}';
+    return '$name fit $score/5';
+  }
+
+  /// Full-width hero on cooking landings: items 3, 6, 9, …
+  static bool isCookingHero(int index) => (index + 1) % 3 == 0;
+
+  static List<String> tagsFor(SeafoodSummary item, DiscoveryCategory category) {
     if (category == DiscoveryCategory.popular) {
       final PopularCardCopy? copy = popularCopy[item.fishId.toUpperCase()];
       if (copy != null) return copy.tags;
     }
     final List<String> tags = <String>[];
     final String label = (item.classification ?? '').toUpperCase();
-    if (label == 'GOOD CHOICE' || label == 'BEST CHOICE') {
-      tags.add(label == 'BEST CHOICE' ? 'WWF Best Choice' : 'WWF Good Choice');
+    if (category != DiscoveryCategory.sustainable &&
+        (label == 'GOOD CHOICE' || label == 'BEST CHOICE')) {
+      tags.add('WWF Good Choice');
     }
     for (final String method in item.suitableMethods) {
       final String? tag = switch (method) {
@@ -251,9 +558,15 @@ class DiscoveryCatalog {
         'curry' => 'Great for Curry',
         'steam' => 'Great for Steaming',
         'fry' => 'Great for Frying',
+        'soup' => 'Great for Soup',
+        'bake' => 'Great for Baking',
+        'raw' => 'Great served raw',
         _ => null,
       };
       if (tag != null) tags.add(tag);
+    }
+    if (category == DiscoveryCategory.all && tags.isEmpty) {
+      tags.add('Versatile');
     }
     return tags.take(2).toList();
   }

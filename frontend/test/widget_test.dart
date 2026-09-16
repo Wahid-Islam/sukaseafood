@@ -102,4 +102,73 @@ void main() {
       expect(catalog.isFavourite('SF001'), isFalse);
     },
   );
+
+  testWidgets('welcome landing leads to signup and sign in', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      SukaSeafoodApp(
+        authController: AuthController.forTesting(),
+        catalogController: CatalogController.forTesting(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('onboarding-signup')), findsOneWidget);
+    expect(find.byKey(const Key('onboarding-signin')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('onboarding-signup')));
+    await tester.pumpAndSettle();
+    expect(find.text('Create your profile'), findsOneWidget);
+    expect(find.text('Create account'), findsOneWidget);
+
+    await tester.tap(find.text('Already have an account? Sign in'));
+    await tester.pumpAndSettle();
+    expect(find.text('Welcome back'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Sign in'), findsOneWidget);
+  });
+
+  testWidgets('profile page matches the saved-account layout', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      SukaSeafoodApp(
+        authController: AuthController.forTesting(
+          profile: const UserProfile(
+            uid: 'test',
+            name: 'Amir Taufiq',
+            email: 'amir@gmail.com',
+            forecastLocationName: 'Selangor',
+          ),
+        ),
+        catalogController: CatalogController.forTesting(),
+      ),
+    );
+    await tester.pump();
+    await tester.tap(find.text('Profile'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Profile'), findsWidgets);
+    expect(find.textContaining('Your seafood journey'), findsOneWidget);
+    expect(find.textContaining('Same Oceans'), findsNothing);
+    expect(find.textContaining('Good Seafood'), findsNothing);
+    expect(find.text('Fish Avatar'), findsOneWidget);
+    expect(find.text('Name'), findsOneWidget);
+    expect(find.text('Amir Taufiq'), findsOneWidget);
+    expect(find.text('amir@gmail.com'), findsOneWidget);
+    expect(find.text('Forecast location'), findsOneWidget);
+    expect(find.text('Selangor'), findsWidgets);
+    expect(find.text('Sign out'), findsOneWidget);
+    expect(find.text('Return to onboarding'), findsOneWidget);
+  });
 }

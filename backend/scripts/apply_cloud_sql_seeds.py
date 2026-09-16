@@ -27,9 +27,12 @@ INSTANCE = "sukaseafood-654b7:us-east4:sukaseafood-654b7-instance"
 DB_USER = "mdwahidislamarefin@gmail.com"
 DB_NAME = "sukaseafood-654b7-database"
 FILES = (
-    (DB_DIR / "schema" / "v3_biodiversity.sql"),
+    (SEED_DIR / "10_wwf_catalogue_54.sql"),
+    (SEED_DIR / "11_wwf_sos_2022.sql"),
     (SEED_DIR / "14_tongkol.sql"),
-    (SEED_DIR / "15_biodiversity.sql"),
+    (SEED_DIR / "16_repoint_tongkol_biodiversity.sql"),
+    (SEED_DIR / "17_deactivate_demuduk.sql"),
+    (SEED_DIR / "18_cooking_54.sql"),
 )
 
 

@@ -46,138 +46,111 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final bool busy = context.watch<AuthController>().isBusy;
-
     return Scaffold(
-      backgroundColor: AppColors.foam,
-      body: ListView(
-        padding: EdgeInsets.zero,
-        children: [
-          DarkHeader(
-            height: 200,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: AppColors.navy,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          tooltip: 'Back',
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.go('/onboarding'),
+        ),
+        title: const Text('Welcome back'),
+      ),
+      body: ContentWidth(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+          children: [
+            const BrandLogo(size: 52),
+            const SizedBox(height: 12),
+            const Text(
+              'Sign in with your email and password.',
+              style: TextStyle(color: AppColors.muted),
+            ),
+            const SizedBox(height: 18),
+            Form(
+              key: _formKey,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
-                    children: [
-                      const BrandLogo(size: 36),
-                      const SizedBox(width: 8),
-                      Text(
-                        'SukaSeafood',
-                        style: Theme.of(
-                          context,
-                        ).textTheme.titleLarge?.copyWith(color: Colors.white),
-                      ),
-                    ],
-                  ),
-                  const Spacer(),
-                  Text(
-                    'Welcome back',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.headlineMedium?.copyWith(color: Colors.white),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Sign in with your email and password.',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.75),
+                  TextFormField(
+                    controller: _email,
+                    keyboardType: TextInputType.emailAddress,
+                    autocorrect: false,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      labelText: 'Email',
+                      prefixIcon: Icon(Icons.mail_outline),
                     ),
+                    validator: (String? v) {
+                      if (v == null || v.trim().isEmpty) {
+                        return 'Enter your email';
+                      }
+                      return null;
+                    },
                   ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _password,
+                    obscureText: _obscure,
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) => busy ? null : _submit(),
+                    decoration: InputDecoration(
+                      labelText: 'Password',
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      suffixIcon: IconButton(
+                        onPressed: () => setState(() => _obscure = !_obscure),
+                        icon: Icon(
+                          _obscure
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                        ),
+                      ),
+                    ),
+                    validator: (String? v) {
+                      if (v == null || v.isEmpty) {
+                        return 'Enter your password';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  FilledButton(
+                    onPressed: busy ? null : _submit,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.tealDark,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size.fromHeight(52),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                    child: busy
+                        ? const SizedBox(
+                            height: 22,
+                            width: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.4,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text('Sign in'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: busy ? null : () => context.go('/signup'),
+                    child: const Text('New here? Create an account'),
+                  ),
                 ],
               ),
             ),
-          ),
-          Transform.translate(
-            offset: const Offset(0, -24),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: SoftCard(
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      TextFormField(
-                        controller: _email,
-                        keyboardType: TextInputType.emailAddress,
-                        autocorrect: false,
-                        textInputAction: TextInputAction.next,
-                        decoration: const InputDecoration(
-                          labelText: 'Email',
-                          prefixIcon: Icon(Icons.mail_outline),
-                        ),
-                        validator: (String? v) {
-                          if (v == null || v.trim().isEmpty) {
-                            return 'Enter your email';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _password,
-                        obscureText: _obscure,
-                        textInputAction: TextInputAction.done,
-                        onFieldSubmitted: (_) => busy ? null : _submit(),
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          prefixIcon: const Icon(Icons.lock_outline),
-                          suffixIcon: IconButton(
-                            onPressed: () =>
-                                setState(() => _obscure = !_obscure),
-                            icon: Icon(
-                              _obscure
-                                  ? Icons.visibility_outlined
-                                  : Icons.visibility_off_outlined,
-                            ),
-                          ),
-                        ),
-                        validator: (String? v) {
-                          if (v == null || v.isEmpty) {
-                            return 'Enter your password';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 20),
-                      FilledButton(
-                        onPressed: busy ? null : _submit,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.navy,
-                          foregroundColor: Colors.white,
-                          minimumSize: const Size.fromHeight(52),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                        child: busy
-                            ? const SizedBox(
-                                height: 22,
-                                width: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.4,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Text('Sign in'),
-                      ),
-                      const SizedBox(height: 12),
-                      TextButton(
-                        onPressed: busy
-                            ? null
-                            : () => context.go('/onboarding'),
-                        child: const Text('New here? Create an account'),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
+            const SizedBox(height: 24),
+            const ShoreFooter(asset: 'assets/images/auth/welcome_shore.png'),
+          ],
+        ),
       ),
     );
   }

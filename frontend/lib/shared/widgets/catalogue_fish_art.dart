@@ -45,7 +45,14 @@ class CatalogueFishArt extends StatelessWidget {
     final int? cacheWidth = width.isFinite
         ? (width * MediaQuery.devicePixelRatioOf(context)).round()
         : null;
-    final Widget image = asset != null
+    final Widget image = (networkUrl != null && networkUrl!.trim().isNotEmpty)
+        ? NetworkFishImage(
+            url: networkUrl!,
+            height: height.isFinite ? height : null,
+            borderRadius: 0,
+            fit: fit,
+          )
+        : asset != null
         ? Image.asset(
             asset,
             fit: fit,
@@ -61,11 +68,9 @@ class CatalogueFishArt extends StatelessWidget {
               );
             },
           )
-        : NetworkFishImage(
-            url: networkUrl,
-            height: height.isFinite ? height : null,
-            borderRadius: 0,
-            fit: fit,
+        : const ColoredBox(
+            color: AppColors.tealSoft,
+            child: Icon(Icons.set_meal, color: AppColors.navy, size: 36),
           );
 
     return ClipRRect(

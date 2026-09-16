@@ -82,7 +82,17 @@ class Settings(BaseSettings):
     cv_confidence_threshold: float | None = None
     cv_intra_op_threads: int = 2
 
+    # --- IUCN Red List -----------------------------------------------------
+    # Official token from api.iucnredlist.org. Empty means we keep the
+    # recorded seed category and leave population trend unavailable.
+    iucn_api_key: str = ""
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    @field_validator("iucn_api_key", mode="before")
+    @classmethod
+    def _strip_iucn_key(cls, v: object) -> object:
+        return v.strip() if isinstance(v, str) else v
 
     @field_validator("database_url")
     @classmethod

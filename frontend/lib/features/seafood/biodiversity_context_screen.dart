@@ -1,165 +1,241 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
 
 import '../../core/theme/app_theme.dart';
-import '../../data/catalog/catalog_controller.dart';
-import '../../data/catalog/fish_ids.dart';
 import '../../data/models/seafood.dart';
 import '../../shared/widgets/catalogue_fish_art.dart';
 import '../../shared/widgets/ui_kit.dart';
 import 'occurrence_map.dart';
 
-class BiodiversityContextScreen extends StatefulWidget {
-  const BiodiversityContextScreen({super.key, required this.seafoodId});
+/// Habitat, IUCN, and OBIS sections used on the Sustainability page.
+class BiodiversityContextSections extends StatelessWidget {
+  const BiodiversityContextSections({super.key, required this.profile});
 
-  final String seafoodId;
-
-  @override
-  State<BiodiversityContextScreen> createState() =>
-      _BiodiversityContextScreenState();
-}
-
-class _BiodiversityContextScreenState extends State<BiodiversityContextScreen> {
-  late final String _fishId = FishIds.canonical(widget.seafoodId);
-  SeafoodProfile? _profile;
-  Object? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    try {
-      final SeafoodProfile profile = await context
-          .read<CatalogController>()
-          .profile(_fishId);
-      if (!mounted) return;
-      setState(() => _profile = profile);
-    } catch (error) {
-      if (!mounted) return;
-      setState(() => _error = error);
-    }
-  }
+  final SeafoodProfile profile;
 
   @override
   Widget build(BuildContext context) {
-    if (_error != null && _profile == null) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('Biodiversity Context'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.pop(),
-          ),
-        ),
-        body: const Center(child: Text('This section is unavailable.')),
-      );
-    }
-    if (_profile == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-
-    final SeafoodProfile profile = _profile!;
     final BiodiversityContext bio = profile.biodiversityContext;
-    final CatalogController catalog = context.watch<CatalogController>();
-    final bool saved = catalog.isFavourite(profile.fishId);
-
-    return Scaffold(
-      backgroundColor: AppColors.foam,
-      appBar: AppBar(
-        backgroundColor: AppColors.foam,
-        surfaceTintColor: Colors.transparent,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
-        title: const Column(
-          children: [
-            Text(
-              'Biodiversity Context',
-              style: TextStyle(fontWeight: FontWeight.w800),
-            ),
-            Text(
-              'Understanding the bigger picture',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: AppColors.muted,
+    return SoftCard(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _SectionNumber(number: '02'),
+              SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'BIODIVERSITY CONTEXT',
+                      style: TextStyle(
+                        color: AppColors.tealDark,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                    Text(
+                      'Why does this fish matter?',
+                      style: TextStyle(color: AppColors.muted, fontSize: 12),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            tooltip: saved ? 'Remove favourite' : 'Save favourite',
-            onPressed: () => catalog.toggleFavourite(profile.fishId),
-            icon: Icon(saved ? Icons.favorite : Icons.favorite_border),
+            ],
           ),
+          const SizedBox(height: 14),
+          const Text(
+            'Where this fish fits',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              color: AppColors.navy,
+            ),
+          ),
+          const SizedBox(height: 8),
+          _WhereThisFishFits(bio: bio),
+          const SizedBox(height: 12),
+          _DistributionCard(bio: bio),
+          const SizedBox(height: 12),
+          _ConservationCard(bio: bio),
+          const SizedBox(height: 12),
+          _SourcesFooter(bio: bio),
         ],
       ),
-      body: ContentWidth(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-          children: [
-            _IdentityCard(profile: profile),
-            const SizedBox(height: 12),
-            const _WhyItMatters(),
-            const SizedBox(height: 12),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: _FactCard(
-                    icon: Icons.waves_outlined,
-                    title: 'Habitat',
-                    body: bio.habitatLabel == null
-                        ? 'Unavailable'
-                        : 'FishBase classifies this species as ${bio.habitatGroup}.',
-                  ),
+    );
+  }
+}
+
+class _WhereThisFishFits extends StatelessWidget {
+  const _WhereThisFishFits({required this.bio});
+
+  final BiodiversityContext bio;
+
+  @override
+  Widget build(BuildContext context) {
+    final String role = (bio.ecologicalRole ?? '').trim();
+    final _FitTile habitat = _FitTile(
+      icon: Icons.waves_outlined,
+      title: 'Habitat',
+      value: bio.habitatLabel ?? 'Unavailable',
+      body: bio.habitatLabel == null
+          ? 'No FishBase habitat record is on file.'
+          : 'Commonly found in coastal waters.',
+    );
+    final _FitTile depth = _FitTile(
+      icon: Icons.vertical_align_center,
+      title: 'Depth range',
+      value: bio.depthLabel ?? 'Unavailable',
+      body: bio.depthLabel == null
+          ? 'No recorded depth range is on file.'
+          : 'Typically found in this depth band.',
+    );
+    final _FitTile ecological = _FitTile(
+      icon: Icons.set_meal_outlined,
+      title: 'Ecological role',
+      value: role.isEmpty ? 'Unavailable' : '',
+      body: role.isEmpty ? 'No ecological-role note is on file.' : role,
+      expand: true,
+    );
+
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        if (constraints.maxWidth < 640) {
+          return Column(
+            children: [
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(child: habitat),
+                    const SizedBox(width: 8),
+                    Expanded(child: depth),
+                  ],
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _FactCard(
-                    icon: Icons.vertical_align_center,
-                    title: 'Depth range',
-                    body: bio.depthLabel == null
-                        ? 'Unavailable'
-                        : 'Commonly found from ${bio.depthLabel}.',
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            _FactCard(
-              icon: Icons.set_meal_outlined,
-              title: 'Ecological role',
-              body:
-                  (bio.ecologicalRole ?? bio.ecosystemNote)
-                          ?.trim()
-                          .isNotEmpty ==
-                      true
-                  ? (bio.ecologicalRole ?? bio.ecosystemNote)!
-                  : 'Unavailable',
-            ),
-            const SizedBox(height: 12),
-            _DistributionCard(bio: bio),
-            const SizedBox(height: 12),
-            _ConservationCard(bio: bio),
-            const SizedBox(height: 16),
-            _SourcesFooter(bio: bio),
-          ],
+              ),
+              const SizedBox(height: 8),
+              ecological,
+            ],
+          );
+        }
+        return IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(child: habitat),
+              const SizedBox(width: 8),
+              Expanded(child: depth),
+              const SizedBox(width: 8),
+              Expanded(child: ecological),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _SectionNumber extends StatelessWidget {
+  const _SectionNumber({required this.number});
+
+  final String number;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 32,
+      height: 32,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: AppColors.tealSoft,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        number,
+        style: const TextStyle(
+          color: AppColors.tealDark,
+          fontWeight: FontWeight.w800,
+          fontSize: 12,
         ),
       ),
     );
   }
 }
 
-class _IdentityCard extends StatelessWidget {
-  const _IdentityCard({required this.profile});
+class _FitTile extends StatelessWidget {
+  const _FitTile({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.body,
+    this.expand = false,
+  });
+
+  final IconData icon;
+  final String title;
+  final String value;
+  final String body;
+  final bool expand;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      alignment: expand ? Alignment.topLeft : Alignment.topCenter,
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7FBFC),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: expand
+            ? CrossAxisAlignment.start
+            : CrossAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: AppColors.tealDark, size: 22),
+          const SizedBox(height: 6),
+          Text(
+            title,
+            textAlign: expand ? TextAlign.left : TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.muted,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (value.trim().isNotEmpty)
+            Text(
+              value,
+              textAlign: expand ? TextAlign.left : TextAlign.center,
+              style: const TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 13,
+                color: AppColors.navy,
+                height: 1.25,
+              ),
+            ),
+          const SizedBox(height: 4),
+          Text(
+            body,
+            textAlign: expand ? TextAlign.left : TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.muted,
+              fontSize: 12,
+              height: 1.35,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class BiodiversityIdentityCard extends StatelessWidget {
+  const BiodiversityIdentityCard({super.key, required this.profile});
 
   final SeafoodProfile profile;
 
@@ -187,6 +263,7 @@ class _IdentityCard extends StatelessWidget {
                   style: const TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 18,
+                    color: AppColors.navy,
                   ),
                 ),
                 Text(
@@ -202,73 +279,15 @@ class _IdentityCard extends StatelessWidget {
                   Text(
                     'Also known as: ${profile.alsoKnownAs}',
                     style: const TextStyle(
-                      color: AppColors.muted,
+                      color: AppColors.ink,
                       fontSize: 12,
+                      height: 1.35,
                     ),
                   ),
                 ],
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _WhyItMatters extends StatelessWidget {
-  const _WhyItMatters();
-
-  @override
-  Widget build(BuildContext context) {
-    return const SoftCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.spa_outlined, color: AppColors.tealDark),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Why biodiversity matters',
-                  style: TextStyle(fontWeight: FontWeight.w800),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Healthy oceans support diverse marine life, which helps ensure seafood is available for future generations.',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FactCard extends StatelessWidget {
-  const _FactCard({
-    required this.icon,
-    required this.title,
-    required this.body,
-  });
-
-  final IconData icon;
-  final String title;
-  final String body;
-
-  @override
-  Widget build(BuildContext context) {
-    return SoftCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: AppColors.tealDark),
-          const SizedBox(height: 8),
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
-          const SizedBox(height: 6),
-          Text(body, style: const TextStyle(fontSize: 13, height: 1.4)),
         ],
       ),
     );
@@ -282,34 +301,49 @@ class _DistributionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SoftCard(
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7FBFC),
+        borderRadius: BorderRadius.circular(18),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.hub_outlined, color: AppColors.tealDark),
-              SizedBox(width: 8),
-              Expanded(
+              const Icon(Icons.place_outlined, color: AppColors.tealDark),
+              const SizedBox(width: 8),
+              const Expanded(
                 child: Text(
-                  'Observed distribution',
-                  style: TextStyle(fontWeight: FontWeight.w800),
+                  'Where this fish is found',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.navy,
+                  ),
                 ),
               ),
+              if (bio.occurrences.isNotEmpty)
+                TextButton(
+                  onPressed: () => _openLargeMap(context),
+                  child: const Text('View larger map  >'),
+                ),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            bio.occurrences.isEmpty
-                ? 'No OBIS occurrence points are on file for this species. Map dots are not invented.'
-                : 'Locations where this species has been observed, based on recorded marine biodiversity data.',
+          const Text(
+            'Recorded observations from marine biodiversity data.',
+            style: TextStyle(color: AppColors.muted, fontSize: 12),
           ),
-          if (bio.occurrences.isNotEmpty) ...[
-            const SizedBox(height: 12),
+          const SizedBox(height: 8),
+          if (bio.occurrences.isEmpty)
+            const Text(
+              'No OBIS occurrence points are on file for this species. Map dots are not invented.',
+            )
+          else ...[
             ClipRRect(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(14),
               child: SizedBox(
-                height: 240,
+                height: 168,
                 width: double.infinity,
                 child: OccurrenceMap(points: bio.occurrences),
               ),
@@ -319,6 +353,45 @@ class _DistributionCard extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+
+  void _openLargeMap(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          insetPadding: const EdgeInsets.all(16),
+          child: SizedBox(
+            height: 420,
+            child: Column(
+              children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 12, 8, 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Where this fish is found',
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(child: OccurrenceMap(points: bio.occurrences)),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Close'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -331,7 +404,12 @@ class _ConservationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final String? badge = bio.iucnBadge;
-    return SoftCard(
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7FBFC),
+        borderRadius: BorderRadius.circular(18),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -342,14 +420,19 @@ class _ConservationCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   'Conservation status',
-                  style: TextStyle(fontWeight: FontWeight.w800),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.navy,
+                  ),
                 ),
+              ),
+              InfoButton(
+                message:
+                    'IUCN Red List categories come from the IUCN token API when it returns a record.',
               ),
             ],
           ),
           const SizedBox(height: 8),
-          const Text('Assessed by the IUCN Red List of Threatened Species.'),
-          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
@@ -382,15 +465,15 @@ class _ConservationCard extends StatelessWidget {
                   ),
                 ),
               ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'IUCN Red List of Threatened Species',
+                  style: TextStyle(color: AppColors.muted, fontSize: 11),
+                ),
+              ),
             ],
           ),
-          if (bio.populationTrend == null) ...[
-            const SizedBox(height: 8),
-            const Text(
-              'Population trend is unavailable. The IUCN token API was not used.',
-              style: TextStyle(fontSize: 12, color: AppColors.muted),
-            ),
-          ],
         ],
       ),
     );
@@ -404,32 +487,68 @@ class _SourcesFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final List<BiodiversitySource> sources = bio.sources;
-    final String cited = sources.isEmpty
-        ? bio.sourceName
-        : sources
-              .where((BiodiversitySource s) => s.available)
-              .map((BiodiversitySource s) => s.name)
-              .join(' · ');
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          cited.isEmpty ? 'Sources: unavailable' : 'Sources: $cited',
-          style: const TextStyle(fontSize: 12, color: AppColors.muted),
-        ),
-        const SizedBox(height: 8),
-        for (final BiodiversitySource source in sources)
-          if (!source.available)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Text(
-                '${source.name}: ${source.unavailableReason ?? 'Unavailable'}',
-                style: const TextStyle(fontSize: 11, color: AppColors.muted),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7FBFC),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.description_outlined, color: AppColors.tealDark),
+              SizedBox(width: 8),
+              Text(
+                'Sources',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.navy,
+                ),
               ),
-            ),
-      ],
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              for (final String name in _sourceNames)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: AppColors.line),
+                  ),
+                  child: Text(
+                    name,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.navy,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
     );
+  }
+
+  List<String> get _sourceNames {
+    final List<String> names = <String>[
+      'WWF Save Our Seafood',
+      ...bio.sources
+          .where((BiodiversitySource s) => s.available)
+          .map((BiodiversitySource s) => s.name),
+    ];
+    return names.toSet().toList();
   }
 }
 

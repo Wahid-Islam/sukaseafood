@@ -23,114 +23,173 @@ class WwfCard extends StatelessWidget {
     final bool varies = methods.length > 1;
     final bool verified = info?.verified == true;
 
-    return Column(
-      children: [
-        SoftCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    final Widget classification = Container(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7FBFC),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  const WwfLogo(height: 36),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'WWF Sustainability Classification',
-                          style: TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        if (varies)
-                          const Text(
-                            'Rating varies by catch method.',
-                            style: TextStyle(
-                              color: AppColors.muted,
-                              fontSize: 12,
-                            ),
-                          ),
-                      ],
-                    ),
+              const WwfLogo(height: 32),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'WWF Sustainability Classification',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                    color: AppColors.navy,
                   ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              if (methods.isEmpty)
-                const ClassificationPill(label: 'UNDETERMINED')
-              else
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    for (int i = 0; i < methods.length; i++) ...[
-                      if (i > 0) const SizedBox(width: 12),
-                      Expanded(child: _MethodColumn(rating: methods[i])),
-                    ],
-                  ],
                 ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Text(
-                    verified
-                        ? 'About WWF ratings'
-                        : 'Not verified — UNDETERMINED is the honest state.',
-                    style: const TextStyle(
+              ),
+              const InfoButton(message: aboutRatings),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Based on assessed fishing methods and their impacts on marine ecosystems.',
+            style: TextStyle(color: AppColors.muted, fontSize: 11, height: 1.3),
+          ),
+          const SizedBox(height: 12),
+          if (methods.isEmpty)
+            const ClassificationPill(label: 'UNDETERMINED')
+          else
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (int i = 0; i < methods.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 8),
+                  Expanded(child: _MethodColumn(rating: methods[i])),
+                ],
+              ],
+            ),
+          if (methods.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              varies
+                  ? 'Rating varies by catch method.'
+                  : _meterCaption(methods.first.classification),
+              style: const TextStyle(color: AppColors.muted, fontSize: 11),
+            ),
+          ],
+        ],
+      ),
+    );
+
+    final Widget why = Container(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3FAF8),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.eco_outlined, color: AppColors.tealDark, size: 18),
+              SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Why this rating?',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.navy,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            info?.whyItMatters ??
+                'We would rather show UNDETERMINED than invent a rating.',
+            style: const TextStyle(fontSize: 13, height: 1.4),
+          ),
+          const SizedBox(height: 12),
+          InkWell(
+            onTap: () {
+              showDialog<void>(
+                context: context,
+                builder: (BuildContext context) {
+                  return AlertDialog(
+                    title: const Text('About WWF ratings'),
+                    content: const Text(aboutRatings),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Close'),
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
+            child: const Row(
+              children: [
+                Icon(Icons.info_outline, size: 16, color: AppColors.tealDark),
+                SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'About WWF ratings',
+                    style: TextStyle(
                       color: AppColors.tealDark,
                       fontWeight: FontWeight.w700,
                       fontSize: 12,
                     ),
                   ),
-                  const InfoButton(message: aboutRatings),
-                ],
-              ),
-            ],
+                ),
+                Icon(Icons.chevron_right, size: 18, color: AppColors.tealDark),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 14),
-        SoftCard(
-          color: AppColors.goodSoft,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: const BoxDecoration(
-                  color: AppColors.tealSoft,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.eco_outlined,
-                  color: AppColors.tealDark,
-                  size: 20,
-                ),
+          if (!verified)
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text(
+                'Not verified — UNDETERMINED is the honest state.',
+                style: TextStyle(color: AppColors.muted, fontSize: 11),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Why?',
-                      style: TextStyle(
-                        color: AppColors.ink,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      info?.whyItMatters ??
-                          'We would rather show UNDETERMINED than invent a rating.',
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+            ),
+        ],
+      ),
     );
+
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        if (constraints.maxWidth < 520) {
+          return Column(
+            children: [classification, const SizedBox(height: 10), why],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(flex: 5, child: classification),
+            const SizedBox(width: 10),
+            Expanded(flex: 4, child: why),
+          ],
+        );
+      },
+    );
+  }
+
+  static String _meterCaption(String classification) {
+    switch (classification.toUpperCase()) {
+      case 'GOOD CHOICE':
+      case 'BEST CHOICE':
+        return 'Better choice for healthier oceans';
+      case 'REDUCE':
+        return 'Eat less often, and confirm the catch method.';
+      case 'AVOID':
+        return 'Avoid this catch method where possible.';
+      default:
+        return 'No verified WWF rating is on file.';
+    }
   }
 }
 
@@ -142,10 +201,8 @@ class _MethodColumn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final Color color = AppTheme.classificationColor(rating.classification);
-    final bool good =
-        rating.classification.toUpperCase() == 'REDUCE' ||
-        rating.classification.toUpperCase() == 'GOOD CHOICE' ||
-        rating.classification.toUpperCase() == 'BEST CHOICE';
+    final String code = rating.classification.toUpperCase();
+    final bool good = code == 'GOOD CHOICE' || code == 'BEST CHOICE';
     return Column(
       children: [
         Container(

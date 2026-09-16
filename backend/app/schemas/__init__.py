@@ -244,6 +244,7 @@ class SeafoodSummaryOut(BaseModel):
     classification: str | None = None
     description: str = ""
     suitable_methods: list[str] = Field(default_factory=list)
+    cooking_scores: dict[str, int] = Field(default_factory=dict)
 
     model_config = ConfigDict(from_attributes=True)
 

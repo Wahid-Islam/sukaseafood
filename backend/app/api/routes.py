@@ -65,7 +65,11 @@ async def database_health(db: AsyncSession = Depends(get_db)) -> DatabaseHealthO
     applied = await schema_is_present()
     count = None
     if applied:
-        count = await db.scalar(select(func.count()).select_from(SeafoodItem))
+        count = await db.scalar(
+            select(func.count())
+            .select_from(SeafoodItem)
+            .where(SeafoodItem.active.is_(True))
+        )
 
     return DatabaseHealthOut(
         status="ok" if applied and count else "degraded",

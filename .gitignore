@@ -43,6 +43,7 @@ frontend/.idea/
 
 # Local zip extract of catalogue photos; committed copies live in assets/
 frontend/Images/
+backend/.cache/
 
 # Large raw OpenDOSM monthly extracts (fetch via data/README.md)
 data/open_dosm/*.csv

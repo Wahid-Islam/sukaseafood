@@ -114,4 +114,18 @@ class AppTheme {
         return AppColors.muted;
     }
   }
+
+  static Color classificationSoft(String classification) {
+    switch (classification.toUpperCase()) {
+      case 'GOOD CHOICE':
+      case 'BEST CHOICE':
+        return AppColors.goodSoft;
+      case 'REDUCE':
+        return const Color(0xFFFFF3E4);
+      case 'AVOID':
+        return const Color(0xFFF8E4E1);
+      default:
+        return AppColors.line;
+    }
+  }
 }

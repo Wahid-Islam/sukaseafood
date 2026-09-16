@@ -12,6 +12,7 @@ class SeafoodSummary {
     this.classification,
     this.description = '',
     this.suitableMethods = const <String>[],
+    this.cookingScores = const <String, int>{},
   });
 
   final String fishId;
@@ -23,6 +24,7 @@ class SeafoodSummary {
   final String? classification;
   final String description;
   final List<String> suitableMethods;
+  final Map<String, int> cookingScores;
 
   /// First Malay name when the canonical form is "Kembung / Pelaling".
   String get shortName {
@@ -44,7 +46,17 @@ class SeafoodSummary {
           .whereType<String>()
           .map((String e) => e.toLowerCase())
           .toList(),
+      cookingScores: _scoresFromJson(json['cooking_scores']),
     );
+  }
+
+  static Map<String, int> _scoresFromJson(Object? raw) {
+    if (raw is! Map) return const <String, int>{};
+    return <String, int>{
+      for (final MapEntry<dynamic, dynamic> e in raw.entries)
+        if (e.key is String && e.value is num)
+          (e.key as String).toLowerCase(): (e.value as num).round(),
+    };
   }
 
   /// Malay, English and scientific names for search hits.

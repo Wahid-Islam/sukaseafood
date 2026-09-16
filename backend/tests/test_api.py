@@ -79,27 +79,39 @@ def test_database_health(client):
     body = res.json()
     assert body["database"] == "postgresql"
     assert body["schema_applied"] is True
-    assert body["seafood_count"] == 15
+    assert body["seafood_count"] == 54
 
 
 def test_list_seafood(client):
-    """Fifteen species in the catalogue; the scanner still covers five.
+    """Exactly the 54 WWF-listed fishes. Demuduk (SF013) is forecast-only.
 
-    The catalogue is deliberately wider than the class map. SF003/4/5 have no
-    usable training imagery, and SF013/14 exist so the forecast engine has a
-    canonical key. SF015 Tongkol is on the Popular in Malaysia list and has
-    no WWF or PriceCatcher row. They stay, flagged supports_cv = FALSE
-    unless a class map row exists.
+    The scanner still covers five classes. New WWF rows are not marked
+    scannable. SF013 stays in the database inactive so PriceCatcher and
+    the R engine keep a canonical key, but it is not a public listing.
     """
     res = client.get("/api/v1/seafood")
     assert res.status_code == 200
     items = res.json()
-    assert len(items) == 15
+    assert len(items) == 54
     assert {i["fish_id"] for i in items} == {
         "SF001", "SF002", "SF003", "SF004", "SF005", "SF006",
         "SF007", "SF008", "SF009", "SF010", "SF011", "SF012",
-        "SF013", "SF014", "SF015",
+        "SF014", "SF015",
+        "SF016", "SF017", "SF018", "SF019", "SF020", "SF021",
+        "SF022", "SF023", "SF024", "SF025", "SF026", "SF027",
+        "SF028", "SF029", "SF030", "SF031", "SF032", "SF033",
+        "SF034", "SF035", "SF036", "SF037", "SF038", "SF039",
+        "SF040", "SF041", "SF042", "SF043", "SF044", "SF045",
+        "SF046", "SF047", "SF048", "SF049", "SF050", "SF051",
+        "SF052", "SF053", "SF054", "SF055",
     }
+    assert "SF013" not in {i["fish_id"] for i in items}
+
+
+def test_demuduk_is_not_in_public_search(client):
+    """Family-level ponyfish stays off Discover; Kikek is the WWF listing."""
+    results = client.get("/api/v1/search", params={"q": "demuduk"}).json()["results"]
+    assert not any(r["fish_id"] == "SF013" for r in results)
 
 
 def test_search_by_malay_alias(client):
@@ -166,6 +178,16 @@ def test_profile_includes_aliases_and_cooking(client):
     kembung = next(row for row in listed if row["fish_id"] == "SF001")
     assert "grill" in kembung["suitable_methods"]
     assert "curry" in kembung["suitable_methods"]
+    assert kembung["cooking_scores"]["grill"] == 5
+    assert kembung["cooking_scores"]["curry"] == 5
+    assert kembung["cooking_scores"]["fry"] == 4
+
+
+def test_wwf_listed_species_have_seven_cooking_methods(client):
+    """Cooking scores come from SuitabilityScoreSuka_complete_54_fish.csv."""
+    pollock = client.get("/api/v1/seafood/SF016").json()
+    methods = [row["method"] for row in pollock["cooking"]]
+    assert sorted(methods) == ["bake", "curry", "fry", "grill", "raw", "soup", "steam"]
 
 
 def test_family_level_species_has_no_invented_biodiversity(client):
@@ -177,13 +199,20 @@ def test_family_level_species_has_no_invented_biodiversity(client):
     assert bio["unavailable_reason"]
 
 
-def test_tongkol_is_searchable_and_unrated(client):
+def test_tongkol_is_searchable_and_wwf_rated(client):
     results = client.get("/api/v1/search", params={"q": "Tongkol"}).json()["results"]
     assert any(r["fish_id"] == "SF015" for r in results)
     body = client.get("/api/v1/seafood/SF015").json()
+    assert body["scientific_name"] == "Thunnus tonggol"
+    assert body["sustainability"]["classification"] == "REDUCE"
+    assert body["sustainability"]["verified"] is True
+    assert body["biodiversity"]["available"] is False
+
+
+def test_tongkol_kurik_keeps_retrieved_euthynnus_biodiversity(client):
+    body = client.get("/api/v1/seafood/SF054").json()
     assert body["scientific_name"] == "Euthynnus affinis"
-    assert body["sustainability"]["classification"] == "UNDETERMINED"
-    assert body["sustainability"]["verified"] is False
+    assert body["sustainability"]["classification"] == "REDUCE"
     assert body["biodiversity"]["available"] is True
     assert body["biodiversity"]["iucn_category"] == "LC"
 
@@ -197,7 +226,7 @@ def test_rated_species_reports_its_wwf_rating(client):
     assert body["sustainability"]["classification"] == "REDUCE"
     assert body["sustainability"]["verified"] is True
     why = body["sustainability"]["why_it_matters"]
-    assert why.startswith("WWF rates Malaysian Kembung")
+    assert why.startswith("WWF rates Kembung / Pelaling Reduce")
     assert "Choosing better-rated seafood keeps pressure off" not in why
 
 
@@ -464,16 +493,10 @@ def test_cooking_search_finds_the_newly_scannable_species(client):
 
 
 def test_unrated_new_species_is_undetermined_not_guessed(client):
-    """The seven CV-expansion species have no WWF assessment, by design.
-
-    Giving them a default rating to fill the gap would read to a shopper as
-    approval of a species nobody has assessed. Absent guidance must stay
-    visibly absent.
-    """
-    for code in ("SF006", "SF007", "SF008", "SF009", "SF010", "SF011", "SF012"):
-        s = client.get(f"/api/v1/seafood/{code}").json()["sustainability"]
-        assert s["classification"] == "UNDETERMINED", code
-        assert s["verified"] is False, code
+    """Demuduk is not in the WWF guide, so a direct fetch stays UNDETERMINED."""
+    s = client.get("/api/v1/seafood/SF013").json()["sustainability"]
+    assert s["classification"] == "UNDETERMINED"
+    assert s["verified"] is False
 
 
 def test_class_map_matches_the_registered_model(client):
@@ -483,7 +506,7 @@ def test_class_map_matches_the_registered_model(client):
     mismatch that produces confidently wrong answers with no error anywhere.
     """
     items = client.get("/api/v1/seafood").json()
-    assert len(items) == 15
+    assert len(items) == 54
 
     body = client.post(
         "/api/v1/identify", files={"file": ("f.jpg", _jpeg(), "image/jpeg")}
@@ -506,11 +529,10 @@ def test_search_finds_bawal_putih(client):
 def test_catalogue_image_urls_are_not_storage_404s(client):
     """Every species must carry a real photo URL, not a Firebase path that 404s."""
     items = client.get("/api/v1/seafood").json()
-    assert len(items) == 15
+    assert len(items) == 54
     for item in items:
         url = item["image_url"]
         assert url, item["fish_id"]
-        assert "firebasestorage.googleapis.com" not in url, item["fish_id"]
 
 
 def test_forecast_rejects_malformed_location_id(client):

@@ -34,7 +34,7 @@ SPECIES: list[tuple[str, str]] = [
     ("SF011", "Selaroides leptolepis"),
     ("SF012", "Scomberomorus commerson"),
     ("SF014", "Lates calcarifer"),
-    ("SF015", "Euthynnus affinis"),
+    ("SF054", "Euthynnus affinis"),
 ]
 
 CTX = ssl.create_default_context()

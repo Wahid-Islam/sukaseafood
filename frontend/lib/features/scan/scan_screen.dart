@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/constants/app_constants.dart';
@@ -109,83 +110,291 @@ class _ScanScreenState extends State<ScanScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.foam,
-      appBar: AppBar(
-        title: const Text('Identify seafood'),
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: () => context.go('/home'),
-        ),
+      body: Stack(
+        children: [
+          const _ScanBackdrop(),
+          SafeArea(
+            child: ContentWidth(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
+                children: [
+                  _ScanChrome(
+                    onClose: () => context.go('/home'),
+                    onInfo: () => _showCoverageInfo(context),
+                  ),
+                  const SizedBox(height: 18),
+                  const _ScanIntro(),
+                  const SizedBox(height: 18),
+                  _Viewfinder(preview: _preview),
+                  const SizedBox(height: 14),
+                  _ScanActionButton(
+                    icon: Icons.photo_camera_outlined,
+                    title: 'Camera',
+                    subtitle: 'Take a photo now',
+                    filled: true,
+                    onTap: _loading ? null : () => _pick(ImageSource.camera),
+                  ),
+                  const SizedBox(height: 10),
+                  _ScanActionButton(
+                    icon: Icons.photo_outlined,
+                    title: 'Gallery',
+                    subtitle: 'Choose from your photos',
+                    filled: false,
+                    onTap: _loading ? null : () => _pick(ImageSource.gallery),
+                  ),
+                  if (_preview != null) ...[
+                    const SizedBox(height: 10),
+                    FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.navy,
+                        minimumSize: const Size(44, 48),
+                      ),
+                      onPressed: _loading || _rejectReason != null
+                          ? null
+                          : _identify,
+                      child: const Text('Identify this photo'),
+                    ),
+                  ],
+                  const SizedBox(height: 14),
+                  const _TipsCard(),
+                  if (_rejectReason != null) ...[
+                    const SizedBox(height: 12),
+                    SoftCard(
+                      child: Text(
+                        _rejectReason!,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
+                  if (_loading) ...[
+                    const SizedBox(height: 12),
+                    const LinearProgressIndicator(color: AppColors.teal),
+                  ],
+                  if (_error != null) _ScanError(error: _error!),
+                  if (_result != null) _Candidates(result: _result!),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
-      body: ContentWidth(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+    );
+  }
+
+  void _showCoverageInfo(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Scanner coverage'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'This scanner currently identifies only these five species. '
+                'Other seafood should be found through Search or Discovery.',
+              ),
+              const SizedBox(height: 10),
+              for (final String name in AppConstants.scannerSpeciesLabels)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text('• $name'),
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ScanBackdrop extends StatelessWidget {
+  const _ScanBackdrop();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 460,
+      width: double.infinity,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(
+            'assets/images/explore/scanner_bg.jpg',
+            fit: BoxFit.cover,
+            alignment: Alignment.topCenter,
+          ),
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: <Color>[
+                  Color(0x6606151F),
+                  Color(0x2206151F),
+                  Color(0x0006151F),
+                  AppColors.foam,
+                ],
+                stops: <double>[0, 0.42, 0.72, 1],
+              ),
+            ),
+          ),
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: <Color>[
+                  Color(0x9906151F),
+                  Color(0x3306151F),
+                  Color(0x0006151F),
+                ],
+                stops: <double>[0, 0.45, 0.85],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ScanChrome extends StatelessWidget {
+  const _ScanChrome({required this.onClose, required this.onInfo});
+
+  final VoidCallback onClose;
+  final VoidCallback onInfo;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        IconButton(
+          tooltip: 'Close',
+          onPressed: onClose,
+          icon: const Icon(Icons.close, color: Colors.white),
+        ),
+        const Expanded(
+          child: Column(
+            children: [
+              Text(
+                'Identify seafood',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                ),
+              ),
+              Text(
+                'Scan. Discover. Choose Better.',
+                style: TextStyle(color: Colors.white70, fontSize: 11),
+              ),
+            ],
+          ),
+        ),
+        IconButton(
+          tooltip: 'Scanner coverage',
+          onPressed: onInfo,
+          icon: const Icon(Icons.info_outline, color: Colors.white),
+        ),
+      ],
+    );
+  }
+}
+
+class _ScanIntro extends StatelessWidget {
+  const _ScanIntro();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Snap\nthe seafood',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+            fontSize: 34,
+            height: 1.05,
+          ),
+        ),
+        const SizedBox(height: 8),
+        const SizedBox(
+          width: 260,
+          child: Text(
+            'Point your camera at the fish on the counter and we will identify it in seconds.',
+            style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.35),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Same Oceans Brighter Tomorrows',
+          style: GoogleFonts.dancingScript(
+            color: const Color(0xFFB7E4DC),
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _Viewfinder extends StatelessWidget {
+  const _Viewfinder({this.preview});
+
+  final Uint8List? preview;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(22),
+      child: SizedBox(
+        height: 210,
+        width: double.infinity,
+        child: Stack(
+          fit: StackFit.expand,
           children: [
-            _CaptureHeader(label: _fileLabel, preview: _preview),
-            const SizedBox(height: 14),
-            const _CoverageCard(),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.teal,
-                      foregroundColor: AppColors.navy,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      minimumSize: const Size(44, 44),
-                    ),
-                    onPressed: _loading
-                        ? null
-                        : () => _pick(ImageSource.camera),
-                    icon: const Icon(Icons.photo_camera),
-                    label: const Text('Camera'),
+            if (preview != null)
+              Image.memory(preview!, fit: BoxFit.cover)
+            else
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: <Color>[Color(0xCC0B2A38), Color(0xB30B1C28)],
                   ),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(44, 44),
+              ),
+            CustomPaint(painter: _CornerBracketsPainter()),
+            if (preview == null)
+              const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.photo_camera_outlined,
+                      color: Colors.white,
+                      size: 42,
                     ),
-                    onPressed: _loading
-                        ? null
-                        : () => _pick(ImageSource.gallery),
-                    icon: const Icon(Icons.photo_library_outlined),
-                    label: const Text('Gallery'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              'One whole fish fills the frame, on a plain background. '
-              'Your photo is used for this identification only and is not stored.',
-              style: TextStyle(fontSize: 12, color: AppColors.muted),
-            ),
-            if (_preview != null) ...[
-              const SizedBox(height: 12),
-              FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.navy,
-                  minimumSize: const Size(44, 48),
-                ),
-                onPressed: _loading || _rejectReason != null ? null : _identify,
-                child: const Text('Identify this photo'),
-              ),
-            ],
-            if (_rejectReason != null) ...[
-              const SizedBox(height: 12),
-              SoftCard(
-                child: Text(
-                  _rejectReason!,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
+                    SizedBox(height: 8),
+                    Text(
+                      'Point at the fish on the counter',
+                      style: TextStyle(color: Colors.white70, fontSize: 13),
+                    ),
+                  ],
                 ),
               ),
-            ],
-            const SizedBox(height: 12),
-            if (_loading) const LinearProgressIndicator(color: AppColors.teal),
-            if (_error != null) _ScanError(error: _error!),
-            if (_result != null) _Candidates(result: _result!),
+            const Positioned(right: 12, bottom: 12, child: _AutoBadge()),
           ],
         ),
       ),
@@ -193,77 +402,218 @@ class _ScanScreenState extends State<ScanScreen> {
   }
 }
 
-class _CoverageCard extends StatelessWidget {
-  const _CoverageCard();
+class _AutoBadge extends StatelessWidget {
+  const _AutoBadge();
 
   @override
   Widget build(BuildContext context) {
-    return SoftCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0x9906151F),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
-            'Scanner coverage',
-            style: TextStyle(fontWeight: FontWeight.w800),
+          Icon(Icons.bolt, size: 14, color: Colors.white),
+          SizedBox(width: 4),
+          Text(
+            'Auto',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: 11,
+            ),
           ),
-          const SizedBox(height: 6),
-          const Text(
-            'This scanner currently identifies only these five species. '
-            'Other seafood should be found through Search or Discovery.',
-          ),
-          const SizedBox(height: 8),
-          for (final String name in AppConstants.scannerSpeciesLabels)
-            Text('• $name'),
         ],
       ),
     );
   }
 }
 
-class _CaptureHeader extends StatelessWidget {
-  const _CaptureHeader({this.label, this.preview});
+class _CornerBracketsPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Paint paint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.85)
+      ..strokeWidth = 2.4
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    const double inset = 18;
+    const double arm = 22;
+    final List<Offset> origins = <Offset>[
+      const Offset(inset, inset),
+      Offset(size.width - inset, inset),
+      Offset(inset, size.height - inset),
+      Offset(size.width - inset, size.height - inset),
+    ];
+    final List<List<Offset>> arms = <List<Offset>>[
+      <Offset>[const Offset(arm, 0), const Offset(0, arm)],
+      <Offset>[const Offset(-arm, 0), const Offset(0, arm)],
+      <Offset>[const Offset(arm, 0), const Offset(0, -arm)],
+      <Offset>[const Offset(-arm, 0), const Offset(0, -arm)],
+    ];
+    for (int i = 0; i < 4; i++) {
+      canvas.drawLine(origins[i], origins[i] + arms[i][0], paint);
+      canvas.drawLine(origins[i], origins[i] + arms[i][1], paint);
+    }
+  }
 
-  final String? label;
-  final Uint8List? preview;
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _ScanActionButton extends StatelessWidget {
+  const _ScanActionButton({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.filled,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool filled;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color foreground = filled ? Colors.white : AppColors.navy;
+    return Material(
+      color: filled ? AppColors.tealDark : Colors.white,
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 64),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            border: filled ? null : Border.all(color: const Color(0xFFD7E4EA)),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: foreground),
+              const SizedBox(width: 10),
+              Container(
+                width: 1,
+                height: 28,
+                color: filled
+                    ? Colors.white.withValues(alpha: 0.35)
+                    : AppColors.line,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: foreground,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: filled ? Colors.white70 : AppColors.muted,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: foreground),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TipsCard extends StatelessWidget {
+  const _TipsCard();
 
   @override
   Widget build(BuildContext context) {
     return SoftCard(
-      padding: EdgeInsets.zero,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: SizedBox(
-          height: 210,
-          width: double.infinity,
-          child: preview != null
-              ? Image.memory(preview!, fit: BoxFit.cover)
-              : Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [AppColors.navyDeep, AppColors.headerTeal],
-                    ),
-                  ),
-                  child: Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.camera_alt_outlined,
-                          color: Colors.white,
-                          size: 46,
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          label ?? 'Point at the fish on the counter',
-                          style: const TextStyle(color: Colors.white70),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-        ),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      child: Column(
+        children: [
+          const _TipRow(
+            icon: Icons.lightbulb_outline,
+            title: 'Scanner coverage',
+            body:
+                'This scanner currently identifies only these five species. '
+                'Other seafood should be found through Search or Discovery.',
+          ),
+          const SizedBox(height: 12),
+          const _TipRow(
+            icon: Icons.photo_camera_outlined,
+            title: 'Quick tip',
+            body:
+                'One whole fish fills the frame, on a plain background. '
+                'Your photo is used for this identification only and is not stored.',
+          ),
+        ],
       ),
+    );
+  }
+}
+
+class _TipRow extends StatelessWidget {
+  const _TipRow({required this.icon, required this.title, required this.body});
+
+  final IconData icon;
+  final String title;
+  final String body;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 34,
+          height: 34,
+          decoration: const BoxDecoration(
+            color: AppColors.tealSoft,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: AppColors.tealDark, size: 18),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.navy,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                body,
+                style: const TextStyle(
+                  color: AppColors.muted,
+                  fontSize: 12,
+                  height: 1.35,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
