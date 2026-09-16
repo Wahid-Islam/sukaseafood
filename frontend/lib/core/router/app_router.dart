@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 import '../auth/auth_controller.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/auth/onboarding_screen.dart';
+import '../../data/models/cooking_intent.dart';
 import '../../features/cooking/cooking_screen.dart';
+import '../../features/cooking/recipe_screen.dart';
 import '../../features/explore/category_landing_screen.dart';
 import '../../features/explore/explore_screen.dart';
 import '../../features/favorites/favorites_screen.dart';
@@ -126,6 +128,25 @@ GoRouter createRouter(AuthController auth) {
         path: '/seafood/:id/swap',
         builder: (context, state) {
           return SmartSwapScreen(seafoodId: state.pathParameters['id']!);
+        },
+      ),
+      GoRoute(
+        path: '/smart-swap',
+        builder: (context, state) {
+          return SmartSwapScreen(
+            initialQuery: state.uri.queryParameters['q'],
+          );
+        },
+      ),
+      GoRoute(
+        path: '/recipe',
+        builder: (context, state) {
+          // `extra` is lost on a web refresh or deep link; fall back to the
+          // Smart Swap flow instead of crashing.
+          final Object? extra = state.extra;
+          return extra is Recipe
+              ? RecipeScreen(recipe: extra)
+              : const SmartSwapScreen();
         },
       ),
       GoRoute(

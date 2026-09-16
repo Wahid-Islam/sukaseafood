@@ -464,16 +464,35 @@ def test_cooking_search_finds_the_newly_scannable_species(client):
 
 
 def test_unrated_new_species_is_undetermined_not_guessed(client):
-    """The seven CV-expansion species have no WWF assessment, by design.
+    """A species with no WWF assessment on file is UNDETERMINED, never guessed.
 
-    Giving them a default rating to fill the gap would read to a shopper as
-    approval of a species nobody has assessed. Absent guidance must stay
-    visibly absent.
+    Giving an unassessed species a default rating to fill the gap would read to
+    a shopper as approval nobody gave. Absent guidance must stay visibly absent.
+
+    Data-driven on purpose: the WWF seed (11_wwf_sos_2022.sql) has since rated
+    most CV-expansion species, so a hard-coded list of "unrated" codes went
+    stale. The rule is what matters, applied to whatever is unrated today.
     """
-    for code in ("SF006", "SF007", "SF008", "SF009", "SF010", "SF011", "SF012"):
+    unrated = []
+    for item in client.get("/api/v1/seafood").json():
+        code = item["fish_id"]
         s = client.get(f"/api/v1/seafood/{code}").json()["sustainability"]
-        assert s["classification"] == "UNDETERMINED", code
-        assert s["verified"] is False, code
+        if not s["assessments"]:
+            unrated.append(code)
+            assert s["classification"] == "UNDETERMINED", code
+            assert s["verified"] is False, code
+    assert unrated, "expected at least one species with no WWF assessment on file"
+
+
+def test_mixed_method_rating_is_undetermined_not_averaged(client):
+    """When WWF rates a species differently by catch method, the headline stays
+    UNDETERMINED and every method-specific rating is shown instead."""
+    for item in client.get("/api/v1/seafood").json():
+        s = client.get(f"/api/v1/seafood/{item['fish_id']}").json()["sustainability"]
+        labels = {a["classification"] for a in s["assessments"]}
+        if len(labels) > 1:
+            assert s["classification"] == "UNDETERMINED", item["fish_id"]
+            assert s["verified"] is True, item["fish_id"]
 
 
 def test_class_map_matches_the_registered_model(client):

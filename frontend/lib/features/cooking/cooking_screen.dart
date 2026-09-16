@@ -345,6 +345,7 @@ class _CookingScreenState extends State<CookingScreen> {
                   const SizedBox(height: 14),
                   SoftCard(
                     color: const Color(0xFFF3EEFF),
+                    onTap: () => context.push('/seafood/${item.fishId}/swap'),
                     child: Row(
                       children: [
                         const Expanded(
@@ -355,7 +356,7 @@ class _CookingScreenState extends State<CookingScreen> {
                                 'Recipe inspiration',
                                 style: TextStyle(fontWeight: FontWeight.w800),
                               ),
-                              Text('Powered by RecipeDB · Coming soon'),
+                              Text('Smart Swap & AI recipes for your dish'),
                             ],
                           ),
                         ),
