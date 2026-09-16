@@ -87,6 +87,17 @@ class Settings(BaseSettings):
     # recorded seed category and leave population trend unavailable.
     iucn_api_key: str = ""
 
+    # --- OpenAI (Epic 4 recipe generation) ---------------------------------
+    # The key lives ONLY on the server (backend/.env locally, a Secret Manager
+    # env var on Cloud Run). The Flutter client never sees it: it calls
+    # POST /recipes/generate and the backend talks to OpenAI.
+    # Left empty, Smart Swap still works (ranking is deterministic) and the
+    # recipe endpoint answers 503 RECIPE_UNAVAILABLE.
+    openai_api_key: str = ""
+    openai_model: str = "gpt-4o-mini"
+    openai_base_url: str = "https://api.openai.com/v1"
+    openai_timeout_seconds: float = 45.0
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     @field_validator("iucn_api_key", mode="before")
@@ -120,6 +131,10 @@ class Settings(BaseSettings):
     @property
     def uses_cloud_sql_connector(self) -> bool:
         return bool(self.instance_connection_name.strip())
+
+    @property
+    def openai_enabled(self) -> bool:
+        return bool(self.openai_api_key.strip())
 
     @property
     def is_production(self) -> bool:

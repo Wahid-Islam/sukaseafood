@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart' show MediaType;
 
 import '../../core/constants/app_constants.dart';
+import '../models/cooking_intent.dart';
 import '../models/identify_result.dart';
 import '../models/price_forecast.dart';
 import '../models/seafood.dart';
@@ -31,6 +32,9 @@ class ApiException implements Exception {
 
   /// Nothing answered at all, so the API base URL or the tunnel is wrong.
   bool get isUnreachable => statusCode == null;
+
+  /// The server has no OpenAI key, so recipe generation is switched off.
+  bool get isRecipeUnavailable => code == 'RECIPE_UNAVAILABLE';
 
   @override
   String toString() => message;
@@ -245,9 +249,73 @@ class ApiClient {
     }
   }
 
+  /// Epic 4 — parse a cooking intent and rank better alternatives.
+  ///
+  /// Send `query` for free text; send structured keys (`cooking_method`,
+  /// `servings`, `fish_id`, …) without a query to re-rank after chip edits.
+  /// An empty string clears a field; null leaves it unset.
+  Future<SmartSwapResult> smartSwap(Map<String, Object?> body) async {
+    return SmartSwapResult.fromJson(await _postJson('/smart-swap', body));
+  }
+
+  /// Epic 4 — recipes for the chosen fish, generated server-side (OpenAI).
+  /// The OpenAI key never leaves the backend.
+  Future<RecipeBatch> generateRecipes({
+    required String fishId,
+    String? cookingMethod,
+    String? dish,
+    int servings = 2,
+    int count = 1,
+    bool kidFriendly = false,
+    List<String> excludeTitles = const <String>[],
+  }) async {
+    final Map<String, dynamic> json = await _postJson(
+      '/recipes/generate',
+      <String, Object?>{
+        'fish_id': fishId,
+        'cooking_method': cookingMethod,
+        'dish': dish,
+        'servings': servings,
+        'count': count,
+        'kid_friendly': kidFriendly,
+        'exclude_titles': excludeTitles,
+      },
+      timeout: const Duration(seconds: 90),
+    );
+    return RecipeBatch.fromJson(json);
+  }
+
   void close() => _client.close();
 
   // --- internals ------------------------------------------------------------
+
+  Future<Map<String, dynamic>> _postJson(
+    String path,
+    Map<String, Object?> body, {
+    Duration? timeout,
+  }) async {
+    final Map<String, Object?> clean = <String, Object?>{
+      for (final MapEntry<String, Object?> e in body.entries)
+        if (e.value != null) e.key: e.value,
+    };
+    try {
+      final http.Response response = await _client
+          .post(
+            _uri(path),
+            headers: const <String, String>{
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode(clean),
+          )
+          .timeout(timeout ?? _timeout);
+      return _decode(response);
+    } on ApiException {
+      rethrow;
+    } catch (error) {
+      throw ApiException(_unreachableMessage(error));
+    }
+  }
 
   Map<String, String> _authHeaders(String token) {
     return <String, String>{
