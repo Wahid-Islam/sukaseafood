@@ -13,7 +13,7 @@ class OccurrenceMap extends StatelessWidget {
 
   final List<OccurrencePoint> points;
 
-  static const String _tileUrl = AppConstants.cartoBasemapsKey.isEmpty
+  static final String _tileUrl = AppConstants.cartoBasemapsKey.isEmpty
       ? 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png'
       : 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png'
             '?key=${AppConstants.cartoBasemapsKey}';

@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.auth_routes import router as auth_router
+from app.api.cooking_routes import router as cooking_router
 from app.api.me_routes import router as me_router
 from app.api.routes import router
 from app.config import get_settings
@@ -63,6 +64,7 @@ def create_app() -> FastAPI:
     app.include_router(router, prefix=settings.api_prefix)
     app.include_router(auth_router, prefix=settings.api_prefix)
     app.include_router(me_router, prefix=settings.api_prefix)
+    app.include_router(cooking_router, prefix=settings.api_prefix)
     return app
 
 

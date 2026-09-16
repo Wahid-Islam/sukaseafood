@@ -1,0 +1,150 @@
+# --- Epic 4: Cooking Intent, Smart Swap, Recipes ------------------------------
+
+
+class IntentChipOut(BaseModel):
+    """One removable chip the UI renders under the intent box."""
+
+    key: Literal["dish", "servings", "fish", "budget", "affordable", "kids"]
+    label: str
+
+
+class CookingIntentOut(BaseModel):
+    """Structured intent parsed from the user's sentence.
+
+    `source`: `rules` (deterministic keyword parse), `llm` (OpenAI fallback,
+    used only when the rules found nothing), or `structured` (the client sent
+    fields directly, e.g. after removing a chip).
+    """
+
+    raw_query: str = ""
+    dish: str | None = None
+    cooking_method: str | None = None
+    servings: int | None = None
+    fish_id: str | None = None
+    fish_name: str | None = None
+    max_price_rm_per_kg: float | None = None
+    prefer_affordable: bool = False
+    kid_friendly: bool = False
+    source: Literal["rules", "llm", "structured"] = "rules"
+    inferred_fields: list[str] = Field(default_factory=list)
+    chips: list[IntentChipOut] = Field(default_factory=list)
+
+
+class SmartSwapRequest(BaseModel):
+    """POST /smart-swap.
+
+    Send `query` for free text. Structured fields sent alongside override the
+    parse; send structured fields alone to re-rank after chip edits. An empty
+    string clears a field.
+    """
+
+    query: str | None = Field(default=None, max_length=300)
+    fish_id: str | None = Field(default=None, description="The user's current choice, if any.")
+    cooking_method: str | None = None
+    dish: str | None = Field(default=None, max_length=80)
+    servings: int | None = Field(default=None, ge=1, le=30)
+    max_price_rm_per_kg: float | None = Field(default=None, gt=0, le=1000)
+    prefer_affordable: bool | None = None
+    kid_friendly: bool | None = None
+    limit: int = Field(default=3, ge=1, le=10)
+
+
+class ScoreBreakdownOut(BaseModel):
+    """Each component is 0-1 before weighting, so the UI can explain a rank."""
+
+    sustainability: float
+    cooking: float
+    price: float
+    attributes: float
+
+
+class SwapFishOut(BaseModel):
+    """One species as it appears on a Smart Swap card."""
+
+    fish_id: str
+    name: str
+    display_name_en: str
+    scientific_name: str
+    fish_type: str
+    image_url: str | None
+    classification: str
+    wwf_colour: Literal["Green", "Yellow", "Red", "Unrated"]
+    is_better_choice: bool
+    cooking_method: str | None = None
+    cooking_score: int | None = Field(default=None, description="Curated 1-5, None if not on file.")
+    cooking_note: str | None = None
+    price_rm_per_kg: float | None = None
+    price_status: str = "Insufficient data"
+    score: int = Field(ge=0, le=100)
+    score_breakdown: ScoreBreakdownOut
+    reasons: list[str] = Field(default_factory=list)
+    caveats: list[str] = Field(default_factory=list)
+
+
+class SmartSwapOut(BaseModel):
+    """POST /smart-swap response."""
+
+    intent: CookingIntentOut
+    status: Literal["SWAP_FOUND", "ALREADY_GOOD", "NO_BETTER_OPTION", "NEEDS_INTENT"]
+    message: str
+    current: SwapFishOut | None = None
+    recommended: SwapFishOut | None = None
+    alternatives: list[SwapFishOut] = Field(default_factory=list)
+    ranking_weights: dict[str, float]
+    recipes_available: bool
+    disclaimer: str = (
+        "Ranking combines WWF Save Our Seafood ratings, SukaSeafood's curated "
+        "cooking-suitability scores and observed PriceCatcher prices. "
+        "UNDETERMINED species are never presented as a better choice."
+    )
+
+
+class RecipeGenerateRequest(BaseModel):
+    """POST /recipes/generate."""
+
+    fish_id: str
+    cooking_method: str | None = None
+    dish: str | None = Field(default=None, max_length=80)
+    servings: int = Field(default=2, ge=1, le=20)
+    count: int = Field(default=1, ge=1, le=3)
+    exclude_titles: list[str] = Field(default_factory=list, max_length=12)
+    kid_friendly: bool = False
+
+
+class RecipeIngredientOut(BaseModel):
+    name: str
+    quantity: str
+    emoji: str = ""
+    note: str = ""
+
+
+class RecipeStepOut(BaseModel):
+    step: int
+    instruction: str
+    minutes: int | None = None
+
+
+class RecipeOut(BaseModel):
+    recipe_id: str
+    title: str
+    description: str
+    fish_id: str
+    fish_name: str
+    cooking_method: str | None
+    time_minutes: int
+    difficulty: Literal["Beginner", "Intermediate", "Advanced"]
+    servings: int
+    tags: list[str] = Field(default_factory=list)
+    ingredients: list[RecipeIngredientOut]
+    steps: list[RecipeStepOut]
+    tips: list[str] = Field(default_factory=list)
+
+
+class RecipeGenerateOut(BaseModel):
+    fish_id: str
+    recipes: list[RecipeOut]
+    generated_by: str
+    disclaimer: str = (
+        "AI-generated recipe suggestion. Check cooking times and that fish is "
+        "cooked through; adjust spice and salt to taste."
+    )
