@@ -91,7 +91,23 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     openai_model: str = "gpt-4o-mini"
     openai_base_url: str = "https://api.openai.com/v1"
-    openai_timeout_seconds: float = 45.0
+    # Three full recipes in one JSON reply take ~20-40 s on gpt-4o-mini.
+    openai_timeout_seconds: float = 90.0
+
+    # Recipe photos. gpt-image-1-mini at medium quality, landscape, is about
+    # US$0.015 per photo; each Smart Swap search asks for three, and a photo
+    # is generated once per recipe and then served from the cache below.
+    # Set RECIPE_IMAGES_ENABLED=false to skip photos (cards fall back to the
+    # catalogue fish art) without touching recipe text generation.
+    recipe_images_enabled: bool = True
+    openai_image_model: str = "gpt-image-1-mini"
+    openai_image_quality: str = "medium"
+    openai_image_size: str = "1536x1024"
+    openai_image_timeout_seconds: float = 120.0
+    # Relative paths resolve against backend/. On Cloud Run this is instance
+    # disk (lost on scale-down), which is fine: a missing photo is simply
+    # regenerated on the next request from its signed URL.
+    recipe_image_cache_dir: str = "generated/recipe_images"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

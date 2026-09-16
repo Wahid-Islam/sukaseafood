@@ -25,7 +25,7 @@ from sqlalchemy.orm import selectinload
 from app.config import get_settings
 from app.models import CookingSuitability, SeafoodItem
 from app.schemas import RecipeGenerateOut, RecipeGenerateRequest, RecipeOut
-from app.services import cooking_intent, openai_client, read_cache
+from app.services import cooking_intent, openai_client, read_cache, recipe_images
 from app.services import seafood as seafood_service
 
 logger = logging.getLogger(__name__)
@@ -50,6 +50,10 @@ Rules:
 - Do not mention sustainability ratings, prices, calories, nutrition or health claims.
 - Quantities use metric or everyday Malaysian units (g, ml, tbsp, tsp, pieces, cloves, stalks).
 - Each ingredient gets one fitting emoji.
+- When asked for several recipes, make them clearly different dishes (different \
+flavour profile, region or technique within the requested cooking method), not \
+variations of one recipe.
+- The description is one short, appetising sentence (max 20 words) for a recipe card.
 
 Reply with a single JSON object exactly in this shape:
 {"recipes": [{
@@ -104,6 +108,10 @@ def _user_prompt(item: SeafoodItem, request: RecipeGenerateRequest, method: str 
     lines.append(f"Servings: {request.servings}.")
     if request.kid_friendly:
         lines.append("Make it kid friendly: mild chilli, bones easy to remove.")
+    if request.difficulty:
+        lines.append(f"Every recipe must be {request.difficulty} difficulty.")
+    if request.dietary and request.dietary.strip():
+        lines.append(f"Dietary preference to respect: {request.dietary.strip()[:60]}.")
     if request.exclude_titles:
         lines.append(
             "Do not repeat these recipes; give clearly different dishes or styles: "
@@ -183,6 +191,9 @@ def _cache_key(item: SeafoodItem, request: RecipeGenerateRequest, method: str | 
         "count": request.count,
         "exclude": sorted(t.strip().lower() for t in request.exclude_titles),
         "kids": request.kid_friendly,
+        "difficulty": request.difficulty,
+        "dietary": (request.dietary or "").strip().lower(),
+        "images": request.include_images and recipe_images.enabled(),
     }
     return "recipes:" + hashlib.sha1(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
@@ -220,6 +231,15 @@ async def generate_recipes(
         recipe = _coerce(raw, item=item, method=method, servings=request.servings)
         if recipe is None or re.sub(r"\W+", "", recipe.title.lower()) in excluded:
             continue
+        if request.include_images and recipe_images.enabled():
+            recipe.image_url = recipe_images.image_path(
+                fish_id=item.code,
+                fish_name=recipe.fish_name,
+                fish_name_en=item.display_name_en,
+                title=recipe.title,
+                description=recipe.description,
+                cooking_method=recipe.cooking_method,
+            )
         recipes.append(recipe)
     if not recipes:
         raise openai_client.OpenAIError("The model did not return a usable recipe.")

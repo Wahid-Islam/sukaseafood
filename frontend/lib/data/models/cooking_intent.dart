@@ -1,6 +1,8 @@
 /// Epic 4 models: `POST /smart-swap` and `POST /recipes/generate`.
 library;
 
+import '../../core/constants/app_constants.dart';
+
 class IntentChip {
   const IntentChip({required this.key, required this.label});
 
@@ -263,6 +265,7 @@ class Recipe {
     this.ingredients = const <RecipeIngredient>[],
     this.steps = const <RecipeStep>[],
     this.tips = const <String>[],
+    this.imageUrl,
   });
 
   final String recipeId;
@@ -278,6 +281,28 @@ class Recipe {
   final List<RecipeIngredient> ingredients;
   final List<RecipeStep> steps;
   final List<String> tips;
+
+  /// Absolute URL of the AI photo, or null when the server has photos off.
+  /// The photo is generated on its first request (roughly 10-30 s) and cached.
+  final String? imageUrl;
+
+  /// "Easy" / "Medium" / "Hard", matching the card copy in the designs.
+  String get difficultyLabel {
+    switch (difficulty) {
+      case 'Beginner':
+        return 'Easy';
+      case 'Advanced':
+        return 'Hard';
+      default:
+        return 'Medium';
+    }
+  }
+
+  static String? _absoluteImageUrl(String? raw) {
+    if (raw == null || raw.isEmpty) return null;
+    if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+    return '${AppConstants.apiBaseUrl}$raw';
+  }
 
   factory Recipe.fromJson(Map<String, dynamic> json) => Recipe(
     recipeId: json['recipe_id'] as String? ?? '',
@@ -303,6 +328,7 @@ class Recipe {
     tips: (json['tips'] as List<dynamic>? ?? const [])
         .whereType<String>()
         .toList(),
+    imageUrl: _absoluteImageUrl(json['image_url'] as String?),
   );
 }
 

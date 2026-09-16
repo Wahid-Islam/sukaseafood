@@ -111,3 +111,6 @@ cv/incoming/
 # artifact in the repository twice and let the two drift apart. run.sh installs
 # it automatically when it is missing.
 backend/cv_package/
+
+# Epic 4: AI recipe photos cached on local disk
+backend/generated/

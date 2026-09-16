@@ -265,8 +265,11 @@ class ApiClient {
     String? cookingMethod,
     String? dish,
     int servings = 2,
-    int count = 1,
+    int count = 3,
     bool kidFriendly = false,
+    String? difficulty,
+    String? dietary,
+    bool includeImages = true,
     List<String> excludeTitles = const <String>[],
   }) async {
     final Map<String, dynamic> json = await _postJson(
@@ -278,9 +281,13 @@ class ApiClient {
         'servings': servings,
         'count': count,
         'kid_friendly': kidFriendly,
+        'difficulty': difficulty,
+        'dietary': dietary,
+        'include_images': includeImages,
         'exclude_titles': excludeTitles,
       },
-      timeout: const Duration(seconds: 90),
+      // Three full recipes in one reply can take 20-40 s.
+      timeout: const Duration(seconds: 120),
     );
     return RecipeBatch.fromJson(json);
   }

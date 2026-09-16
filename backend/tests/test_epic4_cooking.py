@@ -197,3 +197,102 @@ def test_recipes_generate_with_mocked_openai(client, monkeypatch):
     assert seen["body"]["response_format"] == {"type": "json_object"}
     assert "Cencaru" in seen["body"]["messages"][1]["content"]
     assert "sk-test" not in r.text
+
+
+# --- recipe photos ------------------------------------------------------------
+
+
+_RECIPE = {
+    "title": "Crispy Fried Cencaru",
+    "description": "A classic and flavourful Malaysian favourite.",
+    "time_minutes": 30,
+    "difficulty": "Beginner",
+    "servings": 4,
+    "tags": ["Fried", "Malaysian"],
+    "ingredients": [
+        {"name": "Cencaru", "quantity": "4 pieces", "emoji": "🐟"},
+        {"name": "Turmeric", "quantity": "1 tsp", "emoji": "🟡"},
+        {"name": "Salt", "quantity": "1 tsp", "emoji": "🧂"},
+    ],
+    "steps": [
+        {"step": 1, "instruction": "Rub the fish with turmeric and salt.", "minutes": 5},
+        {"step": 2, "instruction": "Shallow-fry until golden on both sides.", "minutes": 12},
+    ],
+}
+
+
+def test_image_token_round_trip_and_tamper():
+    from app.services import recipe_images
+
+    path = recipe_images.image_path(
+        fish_id="SF007",
+        fish_name="Cencaru",
+        fish_name_en="Hardtail Scad",
+        title="Crispy Fried Cencaru",
+        description="Crisp and golden.",
+        cooking_method="fry",
+    )
+    image_id = path.split("/recipes/images/")[1].split(".jpg")[0]
+    token = path.split("?t=")[1]
+    data = recipe_images.read_token(image_id, token)
+    assert data["t"] == "Crispy Fried Cencaru"
+    assert "Cencaru" in recipe_images.build_prompt(data)
+
+    body, sig = token.split(".")
+    with pytest.raises(recipe_images.InvalidImageToken):
+        recipe_images.read_token(image_id, body + "x." + sig)
+    with pytest.raises(recipe_images.InvalidImageToken):
+        recipe_images.read_token("0" * 20, token)
+
+
+def test_recipes_carry_image_urls_and_photo_is_generated_once(client, monkeypatch, tmp_path):
+    import base64
+
+    from app.config import get_settings
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "openai_api_key", "sk-test")
+    monkeypatch.setattr(settings, "recipe_images_enabled", True)
+    monkeypatch.setattr(settings, "recipe_image_cache_dir", str(tmp_path))
+
+    fake_jpeg = b"\xff\xd8\xff\xe0fake-jpeg-bytes\xff\xd9"
+    calls = {"chat": 0, "image": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/chat/completions"):
+            calls["chat"] += 1
+            content = json.dumps({"recipes": [_RECIPE]})
+            return httpx.Response(200, json={"choices": [{"message": {"content": content}}]})
+        calls["image"] += 1
+        body = json.loads(request.content)
+        assert body["model"] == settings.openai_image_model
+        assert body["output_format"] == "jpeg"
+        assert "Cencaru" in body["prompt"]
+        return httpx.Response(200, json={"data": [{"b64_json": base64.b64encode(fake_jpeg).decode()}]})
+
+    openai_client.set_transport_for_tests(httpx.MockTransport(handler))
+    read_cache.clear()
+    try:
+        r = client.post(
+            "/api/v1/recipes/generate",
+            json={"fish_id": "SF007", "cooking_method": "fry", "servings": 4,
+                  "difficulty": "Beginner", "dietary": "Low spice"},
+        )
+        assert r.status_code == 200, r.text
+        recipe = r.json()["recipes"][0]
+        assert recipe["image_url"].startswith("/recipes/images/")
+        assert calls == {"chat": 1, "image": 0}, "photos are made lazily, not in the POST"
+
+        first = client.get("/api/v1" + recipe["image_url"])
+        assert first.status_code == 200
+        assert first.headers["content-type"] == "image/jpeg"
+        assert first.content == fake_jpeg
+
+        again = client.get("/api/v1" + recipe["image_url"])
+        assert again.content == fake_jpeg
+        assert calls["image"] == 1, "second request is served from the cache"
+
+        forged = client.get("/api/v1" + recipe["image_url"][:-3] + "abc")
+        assert forged.status_code == 403
+    finally:
+        openai_client.set_transport_for_tests(None)

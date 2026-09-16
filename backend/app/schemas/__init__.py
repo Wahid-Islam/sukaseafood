@@ -456,9 +456,16 @@ class RecipeGenerateRequest(BaseModel):
     cooking_method: str | None = None
     dish: str | None = Field(default=None, max_length=80)
     servings: int = Field(default=2, ge=1, le=20)
-    count: int = Field(default=1, ge=1, le=3)
+    count: int = Field(default=3, ge=1, le=3)
     exclude_titles: list[str] = Field(default_factory=list, max_length=12)
     kid_friendly: bool = False
+    difficulty: Literal["Beginner", "Intermediate", "Advanced"] | None = None
+    dietary: str | None = Field(
+        default=None,
+        max_length=60,
+        description="Free-text dietary preference, e.g. 'Low spice' or 'No coconut milk'.",
+    )
+    include_images: bool = True
 
 
 class RecipeIngredientOut(BaseModel):
@@ -488,6 +495,14 @@ class RecipeOut(BaseModel):
     ingredients: list[RecipeIngredientOut]
     steps: list[RecipeStepOut]
     tips: list[str] = Field(default_factory=list)
+    image_url: str | None = Field(
+        default=None,
+        description=(
+            "Path relative to the API base (e.g. /recipes/images/<id>.jpg?t=...). "
+            "The photo is generated on first request and cached; None when photos "
+            "are disabled."
+        ),
+    )
 
 
 class RecipeGenerateOut(BaseModel):

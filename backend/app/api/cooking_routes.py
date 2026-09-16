@@ -1,6 +1,7 @@
 """Epic 4 routes: Cooking Intent -> Smart Swap -> Recipe."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -10,7 +11,7 @@ from app.schemas import (
     SmartSwapOut,
     SmartSwapRequest,
 )
-from app.services import openai_client
+from app.services import openai_client, recipe_images
 from app.services import recipes as recipe_service
 from app.services import smart_swap as smart_swap_service
 
@@ -65,3 +66,39 @@ async def generate_recipes(
         raise HTTPException(
             502, detail=_error("RECIPE_GENERATION_FAILED", str(exc))
         ) from exc
+
+
+@router.get(
+    "/recipes/images/{image_id}.jpg",
+    response_class=Response,
+    responses={200: {"content": {"image/jpeg": {}}}},
+)
+async def recipe_image(
+    image_id: str,
+    t: str = Query(..., min_length=10, max_length=2000, description="Signed token from image_url."),
+) -> Response:
+    """AI photo for a generated recipe, made on first request and then cached.
+
+    Only URLs returned in `RecipeOut.image_url` work: the token is signed by
+    this server, so the endpoint cannot be used to generate arbitrary images.
+    Generation takes roughly 10-30 seconds the first time.
+
+    403 INVALID_IMAGE_TOKEN   token missing, tampered with, or for another image
+    503 RECIPE_UNAVAILABLE    photos disabled or no OPENAI_API_KEY
+    502 IMAGE_GENERATION_FAILED  OpenAI errored or returned nothing
+    """
+    try:
+        image = await recipe_images.get_or_generate(image_id, t)
+    except recipe_images.InvalidImageToken as exc:
+        raise HTTPException(403, detail=_error("INVALID_IMAGE_TOKEN", str(exc))) from exc
+    except openai_client.OpenAIUnavailable as exc:
+        raise HTTPException(503, detail=_error("RECIPE_UNAVAILABLE", str(exc))) from exc
+    except openai_client.OpenAIError as exc:
+        raise HTTPException(502, detail=_error("IMAGE_GENERATION_FAILED", str(exc))) from exc
+    return Response(
+        content=image,
+        media_type="image/jpeg",
+        # The image for a given URL never changes, so browsers and the Flutter
+        # image cache may keep it for a day.
+        headers={"Cache-Control": "public, max-age=86400, immutable"},
+    )

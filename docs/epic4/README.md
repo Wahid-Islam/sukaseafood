@@ -43,6 +43,25 @@ a curated score of at least 3/5 for the method. Fish that pass are then scored:
 
 Every card returns a `score_breakdown`, plus the `reasons` and `caveats` shown in "Why …?".
 
+## Screens and flow (v2)
+
+The Smart Swap route now has two views, matching the design PDFs:
+
+1. **Cooking Intent**: the sentence, example chips, optional preferences (people, budget, difficulty, dietary), "What we'll consider", and **Find my better match**.
+2. **Finding your better match…**: a progress card with three steps.
+   - *Understanding your dish* and *Comparing seafood choices* complete when `POST /smart-swap` returns.
+   - *Cooking up recipes* completes when `POST /recipes/generate` has returned **3 recipes** and their photos have been pre-loaded (it gives up waiting after 75 s, and any unfinished photo keeps loading in its card).
+3. **Your Smart Swap**: "We understand your request as" (method and serves dropdowns re-rank), the swap cards, **Why <fish>?** (reasons, score bars, other options), and a carousel of 3 recipe photo cards with **View all** / **Show 3 more recipes**.
+
+## Recipe photos
+
+- Each recipe returns `image_url` (`/recipes/images/<id>.jpg?t=<signed token>`). The photo is generated on its **first request** with `gpt-image-1-mini` (medium quality, 1536×1024 JPEG), then cached on disk in `backend/generated/recipe_images/`, which is gitignored.
+- The token is HMAC-signed with `JWT_SECRET`, so only URLs this server issued can spend credit.
+- **Cost:** about US$0.015 per photo, so about $0.05 per new search (3 photos). Repeat views are free.
+- **Settings:** `RECIPE_IMAGES_ENABLED`, `OPENAI_IMAGE_MODEL`, `OPENAI_IMAGE_QUALITY`, `OPENAI_IMAGE_SIZE`, `RECIPE_IMAGE_CACHE_DIR`.
+- If a photo fails (or photos are off), the card falls back to the catalogue fish art.
+- On Cloud Run the disk cache is per instance. A missing photo is regenerated from its signed URL, so nothing breaks, but it costs again. Move the cache to Firebase Storage if that becomes noticeable.
+
 ## Security
 
 - The OpenAI key stays on the backend. Flutter only calls your API.

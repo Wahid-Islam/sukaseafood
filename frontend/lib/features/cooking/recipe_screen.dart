@@ -6,8 +6,8 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/catalog/catalog_controller.dart';
 import '../../data/models/cooking_intent.dart';
-import '../../shared/widgets/catalogue_fish_art.dart';
 import '../../shared/widgets/ui_kit.dart';
+import 'recipe_image.dart';
 
 /// Epic 4 step 3 — a recipe the user can actually cook.
 class RecipeScreen extends StatelessWidget {
@@ -45,19 +45,11 @@ class RecipeScreen extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 110),
           children: [
-            ClipRRect(
+            RecipeImage(
+              recipe: recipe,
+              height: 230,
               borderRadius: BorderRadius.circular(22),
-              child: SizedBox(
-                height: 210,
-                child: CatalogueFishArt(
-                  fishId: recipe.fishId,
-                  networkUrl: catalog.itemById(recipe.fishId)?.imageUrl,
-                  width: double.infinity,
-                  height: 210,
-                  borderRadius: 22,
-                  fit: BoxFit.cover,
-                ),
-              ),
+              fallbackImageUrl: catalog.itemById(recipe.fishId)?.imageUrl,
             ),
             const SizedBox(height: 16),
             Text(
