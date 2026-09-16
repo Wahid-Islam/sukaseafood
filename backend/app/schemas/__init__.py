@@ -466,6 +466,14 @@ class RecipeGenerateRequest(BaseModel):
         description="Free-text dietary preference, e.g. 'Low spice' or 'No coconut milk'.",
     )
     include_images: bool = True
+    cuisines: list[Literal["Malay", "Chinese", "Indian"]] | None = Field(
+        default=None,
+        max_length=3,
+        description=(
+            "Cuisine for each recipe, in order. Default: Malay, Chinese, Indian, "
+            "cycling if count differs."
+        ),
+    )
 
 
 class RecipeIngredientOut(BaseModel):
@@ -491,6 +499,7 @@ class RecipeOut(BaseModel):
     time_minutes: int
     difficulty: Literal["Beginner", "Intermediate", "Advanced"]
     servings: int
+    cuisine: Literal["Malay", "Chinese", "Indian"] | None = None
     tags: list[str] = Field(default_factory=list)
     ingredients: list[RecipeIngredientOut]
     steps: list[RecipeStepOut]

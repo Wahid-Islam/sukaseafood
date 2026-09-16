@@ -37,22 +37,48 @@ class FishNotFound(LookupError):
     pass
 
 
+CUISINES = ("Malay", "Chinese", "Indian")
+
+CUISINE_HINTS = {
+    "Malay": "Malay home cooking, e.g. asam pedas, masak lemak, ikan bakar, sambal, gulai, goreng kunyit",
+    "Chinese": "Malaysian Chinese home cooking, e.g. Teochew/Cantonese steaming, soy-ginger, sweet-sour, black bean, fish head curry, fish soup with tofu",
+    "Indian": "Malaysian Indian home cooking, e.g. meen kulambu, fish varuval, fish molee, pepper fry, tamarind fish curry with curry leaves",
+}
+
+
+def cuisines_for(request: RecipeGenerateRequest) -> list[str]:
+    """One cuisine per recipe: Malay, Chinese, Indian by default, cycling.
+
+    "Show 3 more" continues the rotation from how many recipes the client
+    already has (exclude_titles), so every batch stays mixed.
+    """
+    base = list(request.cuisines) if request.cuisines else list(CUISINES)
+    offset = 0 if request.cuisines else len(request.exclude_titles) % len(base)
+    return [base[(offset + i) % len(base)] for i in range(request.count)]
+
+
 SYSTEM_PROMPT = """You are the recipe writer for SukaSeafood, a Malaysian app that helps \
-home cooks choose sustainable seafood. Write practical, home-kitchen recipes using \
-ingredients easily found in a Malaysian wet market or supermarket.
+home cooks choose sustainable seafood. Malaysia's kitchens are Malay, Chinese and Indian, \
+and you write authentic home-style recipes from all three, using ingredients easily found \
+in a Malaysian wet market or supermarket.
 
 Rules:
 - The named fish is the only seafood in the recipe. Refer to it by its Malay name.
 - Scale every quantity to the requested number of servings. Allow roughly \
 150-200 g of fish per adult serving, or whole fish/pieces where that is how it is sold.
-- Halal-friendly: no pork, no alcohol.
 - Cooking times must be realistic and the fish must be cooked through.
 - Do not mention sustainability ratings, prices, calories, nutrition or health claims.
 - Quantities use metric or everyday Malaysian units (g, ml, tbsp, tsp, pieces, cloves, stalks).
 - Each ingredient gets one fitting emoji.
-- When asked for several recipes, make them clearly different dishes (different \
-flavour profile, region or technique within the requested cooking method), not \
-variations of one recipe.
+- Each recipe is assigned a cuisine (Malay, Chinese or Indian). Write a dish that \
+home cooks of that community in Malaysia would recognise, with that cuisine's own \
+aromatics, sauces and techniques, while keeping the requested cooking method. If the \
+requested dish belongs to one cuisine (e.g. asam pedas is Malay), use it for that \
+cuisine and give the closest same-method dish for the others.
+- Titles may use the dish's usual local name (Malay, Chinese or Tamil/English) and \
+must include the fish's Malay name.
+- Halal-friendly for every cuisine: no pork, lard, alcohol or rice wine (use \
+alternatives such as extra ginger, stock or a splash of vinegar).
 - The description is one short, appetising sentence (max 20 words) for a recipe card.
 
 Reply with a single JSON object exactly in this shape:
@@ -62,7 +88,8 @@ Reply with a single JSON object exactly in this shape:
   "time_minutes": integer,
   "difficulty": "Beginner" | "Intermediate" | "Advanced",
   "servings": integer,
-  "tags": ["3 short tags, e.g. Curry, Malaysian, Family friendly"],
+  "cuisine": "Malay" | "Chinese" | "Indian",
+  "tags": ["3 short tags, e.g. Curry, Family friendly, Quick"],
   "ingredients": [{"name": "string", "quantity": "string", "emoji": "string", "note": "optional string"}],
   "steps": [{"step": 1, "instruction": "string", "minutes": integer or null}],
   "tips": ["up to 2 short tips"]
@@ -118,11 +145,26 @@ def _user_prompt(item: SeafoodItem, request: RecipeGenerateRequest, method: str 
             + "; ".join(t.strip()[:80] for t in request.exclude_titles if t.strip())
             + "."
         )
-    lines.append(f"Write {request.count} recipe{'s' if request.count > 1 else ''}.")
+    cuisines = cuisines_for(request)
+    lines.append(
+        f"Write {request.count} recipe{'s' if request.count > 1 else ''}, in this "
+        f"order and cuisine: "
+        + "; ".join(
+            f"{i + 1}. {c} ({CUISINE_HINTS.get(c, c)})" for i, c in enumerate(cuisines)
+        )
+        + "."
+    )
     return "\n".join(lines)
 
 
-def _coerce(raw: dict, *, item: SeafoodItem, method: str | None, servings: int) -> RecipeOut | None:
+def _coerce(
+    raw: dict,
+    *,
+    item: SeafoodItem,
+    method: str | None,
+    servings: int,
+    expected_cuisine: str | None = None,
+) -> RecipeOut | None:
     """Validate one model recipe; return None if it cannot be trusted."""
     if not isinstance(raw, dict):
         return None
@@ -169,6 +211,7 @@ def _coerce(raw: dict, *, item: SeafoodItem, method: str | None, servings: int) 
             time_minutes=max(5, min(240, int(raw.get("time_minutes") or 30))),
             difficulty=difficulty,
             servings=servings,
+            cuisine=_cuisine(raw.get("cuisine"), expected_cuisine),
             tags=[str(t).strip() for t in (raw.get("tags") or []) if str(t).strip()][:4],
             ingredients=ingredients,
             steps=normalised_steps,
@@ -180,6 +223,11 @@ def _coerce(raw: dict, *, item: SeafoodItem, method: str | None, servings: int) 
     if not recipe.title or len(recipe.ingredients) < 3 or len(recipe.steps) < 2:
         return None
     return recipe
+
+
+def _cuisine(value: object, expected: str | None) -> str | None:
+    text = str(value or "").strip().title()
+    return text if text in CUISINES else expected
 
 
 def _cache_key(item: SeafoodItem, request: RecipeGenerateRequest, method: str | None) -> str:
@@ -194,6 +242,7 @@ def _cache_key(item: SeafoodItem, request: RecipeGenerateRequest, method: str | 
         "difficulty": request.difficulty,
         "dietary": (request.dietary or "").strip().lower(),
         "images": request.include_images and recipe_images.enabled(),
+        "cuisines": cuisines_for(request),
     }
     return "recipes:" + hashlib.sha1(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
@@ -227,8 +276,15 @@ async def generate_recipes(
         raw_recipes = [data]
     excluded = {re.sub(r"\W+", "", t.lower()) for t in request.exclude_titles}
     recipes: list[RecipeOut] = []
-    for raw in raw_recipes or []:
-        recipe = _coerce(raw, item=item, method=method, servings=request.servings)
+    expected = cuisines_for(request)
+    for index, raw in enumerate(raw_recipes or []):
+        recipe = _coerce(
+            raw,
+            item=item,
+            method=method,
+            servings=request.servings,
+            expected_cuisine=expected[index] if index < len(expected) else None,
+        )
         if recipe is None or re.sub(r"\W+", "", recipe.title.lower()) in excluded:
             continue
         if request.include_images and recipe_images.enabled():
@@ -239,6 +295,7 @@ async def generate_recipes(
                 title=recipe.title,
                 description=recipe.description,
                 cooking_method=recipe.cooking_method,
+                cuisine=recipe.cuisine,
             )
         recipes.append(recipe)
     if not recipes:

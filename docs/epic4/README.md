@@ -53,6 +53,10 @@ The Smart Swap route now has two views, matching the design PDFs:
    - *Cooking up recipes* completes when `POST /recipes/generate` has returned **3 recipes** and their photos have been pre-loaded (it gives up waiting after 75 s, and any unfinished photo keeps loading in its card).
 3. **Your Smart Swap**: "We understand your request as" (method and serves dropdowns re-rank), the swap cards, **Why <fish>?** (reasons, score bars, other options), and a carousel of 3 recipe photo cards with **View all** / **Show 3 more recipes**.
 
+## Malay, Chinese and Indian recipes
+
+Every batch of 3 recipes has **one Malay, one Chinese and one Indian** dish, all using the requested cooking method (for example goreng kunyit, a ginger-soy steamed dish, and varuval for frying). "Show 3 more" continues the rotation. Each recipe returns `cuisine`, which the cards show as a coloured badge, and the photo prompt uses that cuisine's plating style. All three stay halal-friendly: no pork, lard, alcohol or rice wine. A client can override the rotation with `cuisines: ["Chinese", ...]`.
+
 ## Recipe photos
 
 - Each recipe returns `image_url` (`/recipes/images/<id>.jpg?t=<signed token>`). The photo is generated on its **first request** with `gpt-image-1-mini` (medium quality, 1536×1024 JPEG), then cached on disk in `backend/generated/recipe_images/`, which is gitignored.

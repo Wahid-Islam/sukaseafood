@@ -774,7 +774,8 @@ class _SmartSwapScreenState extends State<SmartSwapScreen> {
             title: chosen.fishId != result.current?.fishId
                 ? 'Recipes for your new choice'
                 : 'Recipes for ${chosen.name}',
-            subtitle: 'Simple, delicious recipes to help you get cooking.',
+            subtitle:
+                'Malay, Chinese and Indian recipes to help you get cooking.',
             trailing: _recipes.isEmpty
                 ? null
                 : TextButton(
@@ -2176,6 +2177,9 @@ class _RecipeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final CatalogController catalog = context.watch<CatalogController>();
     final bool saved = catalog.isFavourite(recipe.fishId);
+    final String? badge =
+        recipe.cuisine ?? (recipe.tags.isEmpty ? null : recipe.tags.first);
+    final Color badgeColor = cuisineColor(recipe.cuisine);
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(20),
@@ -2262,7 +2266,7 @@ class _RecipeCard extends StatelessWidget {
                         style: const TextStyle(fontSize: 12, color: _kInk),
                       ),
                       const SizedBox(width: 12),
-                      if (recipe.tags.isNotEmpty)
+                      if (badge != null)
                         Flexible(
                           child: Container(
                             padding: const EdgeInsets.symmetric(
@@ -2270,16 +2274,17 @@ class _RecipeCard extends StatelessWidget {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: AppColors.tealSoft,
+                              color: badgeColor.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(999),
                             ),
                             child: Text(
-                              recipe.tags.first,
+                              badge,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 11,
-                                color: _kTeal,
+                                fontWeight: FontWeight.w700,
+                                color: badgeColor,
                               ),
                             ),
                           ),

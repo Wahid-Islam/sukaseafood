@@ -80,6 +80,7 @@ def image_path(
     title: str,
     description: str,
     cooking_method: str | None,
+    cuisine: str | None = None,
 ) -> str:
     """The URL (relative to the API base) the client loads the photo from."""
     image_id = image_id_for(fish_id, title)
@@ -91,6 +92,7 @@ def image_path(
             "t": title[:120],
             "d": description[:240],
             "m": (cooking_method or "")[:20],
+            "c": (cuisine or "")[:10],
         },
         separators=(",", ":"),
         ensure_ascii=False,
@@ -131,13 +133,21 @@ def build_prompt(data: dict) -> str:
     fish = data.get("f", "fish")
     fish_en = data.get("e") or ""
     fish_desc = f"{fish} ({fish_en})" if fish_en else fish
+    style = {
+        "Malay": "Malay home-style cooking, served in a ceramic dish with fresh herbs, "
+        "sliced chilli and lime",
+        "Chinese": "Malaysian Chinese home-style cooking, served on a white porcelain "
+        "plate with spring onion, ginger and coriander",
+        "Indian": "Malaysian Indian home-style cooking, served in a steel or clay dish "
+        "with curry leaves, and a banana leaf nearby",
+    }.get(str(data.get("c", "")), "Malaysian home-style cooking, plated with fresh herbs "
+          "and lime")
     return (
         f"Appetising, realistic food photograph of {data.get('t', 'a Malaysian fish dish')}: "
         f"{data.get('d', '')} Made with {fish_desc}{', ' + method if method else ''}. "
-        "Malaysian home-style cooking, plated on a ceramic dish on a light marble "
-        "kitchen table with fresh herbs, sliced chilli and lime. Soft natural "
-        "daylight, 45-degree angle, shallow depth of field, vibrant but natural "
-        "colours. No text, no logos, no people, no hands."
+        f"{style}, on a light marble kitchen table. Soft natural daylight, 45-degree "
+        "angle, shallow depth of field, vibrant but natural colours. No text, no "
+        "logos, no people, no hands."
     )
 
 

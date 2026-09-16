@@ -266,6 +266,7 @@ class Recipe {
     this.steps = const <RecipeStep>[],
     this.tips = const <String>[],
     this.imageUrl,
+    this.cuisine,
   });
 
   final String recipeId;
@@ -285,6 +286,9 @@ class Recipe {
   /// Absolute URL of the AI photo, or null when the server has photos off.
   /// The photo is generated on its first request (roughly 10-30 s) and cached.
   final String? imageUrl;
+
+  /// Malay, Chinese or Indian. Each batch of three has one of each.
+  final String? cuisine;
 
   /// "Easy" / "Medium" / "Hard", matching the card copy in the designs.
   String get difficultyLabel {
@@ -329,6 +333,7 @@ class Recipe {
         .whereType<String>()
         .toList(),
     imageUrl: _absoluteImageUrl(json['image_url'] as String?),
+    cuisine: json['cuisine'] as String?,
   );
 }
 

@@ -296,3 +296,42 @@ def test_recipes_carry_image_urls_and_photo_is_generated_once(client, monkeypatc
         assert forged.status_code == 403
     finally:
         openai_client.set_transport_for_tests(None)
+
+
+def test_three_recipes_cover_malay_chinese_indian(client, monkeypatch, tmp_path):
+    from app.config import get_settings
+    from app.schemas import RecipeGenerateRequest
+    from app.services.recipes import cuisines_for
+
+    assert cuisines_for(RecipeGenerateRequest(fish_id="SF007")) == ["Malay", "Chinese", "Indian"]
+    more = RecipeGenerateRequest(fish_id="SF007", exclude_titles=["a", "b", "c", "d"])
+    assert cuisines_for(more) == ["Chinese", "Indian", "Malay"]
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "openai_api_key", "sk-test")
+    monkeypatch.setattr(settings, "recipe_image_cache_dir", str(tmp_path))
+    seen: dict = {}
+
+    def recipe(title, cuisine):
+        return {**_RECIPE, "title": title, "cuisine": cuisine}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["prompt"] = json.loads(request.content)["messages"][1]["content"]
+        content = json.dumps({"recipes": [
+            recipe("Cencaru Goreng Kunyit", "Malay"),
+            recipe("Steamed Cencaru with Ginger", "chinese"),
+            # A missing cuisine falls back to the one that slot was assigned.
+            {k: v for k, v in recipe("Cencaru Varuval", "Indian").items() if k != "cuisine"},
+        ]})
+        return httpx.Response(200, json={"choices": [{"message": {"content": content}}]})
+
+    openai_client.set_transport_for_tests(httpx.MockTransport(handler))
+    read_cache.clear()
+    try:
+        r = client.post("/api/v1/recipes/generate", json={"fish_id": "SF007", "cooking_method": "fry"})
+    finally:
+        openai_client.set_transport_for_tests(None)
+
+    assert r.status_code == 200, r.text
+    assert [x["cuisine"] for x in r.json()["recipes"]] == ["Malay", "Chinese", "Indian"]
+    assert "1. Malay" in seen["prompt"] and "2. Chinese" in seen["prompt"] and "3. Indian" in seen["prompt"]

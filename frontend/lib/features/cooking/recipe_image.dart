@@ -4,6 +4,20 @@ import '../../core/theme/app_theme.dart';
 import '../../data/models/cooking_intent.dart';
 import '../../shared/widgets/catalogue_fish_art.dart';
 
+/// Badge colour for a recipe's cuisine (Malay, Chinese, Indian).
+Color cuisineColor(String? cuisine) {
+  switch (cuisine) {
+    case 'Malay':
+      return const Color(0xFF0E8F84);
+    case 'Chinese':
+      return const Color(0xFFC0392B);
+    case 'Indian':
+      return const Color(0xFFD9822B);
+    default:
+      return AppColors.tealDark;
+  }
+}
+
 /// The AI photo for a generated recipe.
 ///
 /// The first request for a photo can take 10-30 seconds while the backend

@@ -73,6 +73,22 @@ class RecipeScreen extends StatelessWidget {
                 _MetaChip(icon: Icons.timer_outlined, label: '${recipe.timeMinutes} mins'),
                 _MetaChip(icon: Icons.soup_kitchen_outlined, label: recipe.difficulty),
                 _MetaChip(icon: Icons.people_outline, label: 'Serves ${recipe.servings}'),
+                if (recipe.cuisine != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: cuisineColor(recipe.cuisine).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      '${recipe.cuisine} recipe',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: cuisineColor(recipe.cuisine),
+                      ),
+                    ),
+                  ),
               ],
             ),
             if (recipe.tags.isNotEmpty) ...[
